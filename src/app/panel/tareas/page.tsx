@@ -18,8 +18,10 @@ const sinTildes = (texto: string) =>
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
 
-function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
-  const { perfil, tareas, perfiles } = useStore();
+const SIN_OBRA = "ninguna";
+
+function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; obraInicial: string }) {
+  const { perfil, tareas, perfiles, obras } = useStore();
   const { t } = useT();
   const hoy = useHoy();
   const router = useRouter();
@@ -27,6 +29,7 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
 
   const [vista, setVista] = useState<Vista>(estadoInicial === "completada" ? "completadas" : "abiertas");
   const [estado, setEstado] = useState<Estado | "">(estadoInicial);
+  const [obra, setObra] = useState(obraInicial);
   const [responsable, setResponsable] = useState("");
   const [prioridad, setPrioridad] = useState("");
   const [soloVencidas, setSoloVencidas] = useState(false);
@@ -37,6 +40,7 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
   const lista = tareas
     .filter((x) => (vista === "todas" ? true : vista === "abiertas" ? abierta(x) : !abierta(x)))
     .filter((x) => !estado || x.estado === estado)
+    .filter((x) => !obra || (obra === SIN_OBRA ? !x.obraId : x.obraId === obra))
     .filter((x) => !responsable || (responsable === "nadie" ? !x.asignadaA : x.asignadaA === responsable))
     .filter((x) => !prioridad || x.prioridad === prioridad)
     .filter((x) => !soloVencidas || vencida(x, hoy))
@@ -52,6 +56,21 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
   const estados = ESTADOS.filter((e) =>
     vista === "todas" ? true : vista === "abiertas" ? e !== "completada" : e === "completada",
   );
+  // Se ofrecen las obras activas y cualquier otra que tenga tareas a la vista.
+  const conTareas = new Set(tareas.map((x) => x.obraId));
+  const opciones = [
+    { id: "", nombre: t.obras.todas },
+    ...obras.filter((o) => o.activa || conTareas.has(o.id) || o.id === obra).map((o) => ({ id: o.id, nombre: o.nombre })),
+    ...(conTareas.has(null) ? [{ id: SIN_OBRA, nombre: t.comun.sinObra }] : []),
+  ];
+  // Sin obra elegida, la lista se parte por obra.
+  const grupos = obra
+    ? []
+    : opciones
+        .slice(1)
+        .map((o) => ({ ...o, tareas: lista.filter((x) => (o.id === SIN_OBRA ? !x.obraId : x.obraId === o.id)) }))
+        .filter((g) => g.tareas.length > 0);
+
   const cambiarVista = (nueva: Vista) => {
     setVista(nueva);
     setEstado("");
@@ -69,7 +88,28 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
       </Encabezado>
 
       {creando && (
-        <TareaForm onCancel={() => setCreando(false)} onDone={(id) => router.push(`/panel/tareas/${id}`)} />
+        <TareaForm
+          obraInicial={obra && obra !== SIN_OBRA ? obra : null}
+          onCancel={() => setCreando(false)}
+          onDone={(id, sinArchivos) => router.push(`/panel/tareas/${id}${sinArchivos ? "?aviso=archivo" : ""}`)}
+        />
+      )}
+
+      {opciones.length > 2 && (
+        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label={t.campos.obra}>
+          {opciones.map((o) => (
+            <button
+              key={o.id}
+              aria-pressed={obra === o.id}
+              onClick={() => setObra(o.id)}
+              className={`min-h-11 shrink-0 rounded-[3px] border px-4 text-sm font-medium whitespace-nowrap transition-colors ${
+                obra === o.id ? "border-tinta bg-tinta text-papel" : "border-tinta/30 hover:border-tinta"
+              }`}
+            >
+              {o.nombre}
+            </button>
+          ))}
+        </div>
       )}
 
       <div>
@@ -84,10 +124,10 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
             </button>
           ))}
         </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
+        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
           <input
             type="search"
-            className="campo"
+            className="campo col-span-2 lg:col-span-1"
             placeholder={t.tareas.buscar}
             aria-label={t.tareas.buscar}
             value={busqueda}
@@ -142,10 +182,10 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
             </select>
           )}
           {vista !== "completadas" && (
-            <label className="flex cursor-pointer items-center gap-2 px-1 text-sm whitespace-nowrap">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm whitespace-nowrap">
               <input
                 type="checkbox"
-                className="h-4 w-4 accent-[var(--alerta)]"
+                className="h-5 w-5 accent-[var(--alerta)] sm:h-4 sm:w-4"
                 checked={soloVencidas}
                 onChange={(e) => setSoloVencidas(e.target.checked)}
               />
@@ -157,16 +197,35 @@ function Tareas({ estadoInicial }: { estadoInicial: Estado | "" }) {
 
       {lista.length === 0 ? (
         <p className="border-y border-regla py-12 text-center text-gris">{t.tareas.vacio}</p>
+      ) : grupos.length > 1 ? (
+        <div className="space-y-10">
+          {grupos.map((g, i) => (
+            <section key={g.id}>
+              <h2 className="mb-3 flex items-baseline justify-between gap-3">
+                <button
+                  className="text-left font-display text-xl font-bold tracking-tight underline-offset-4 hover:underline"
+                  onClick={() => setObra(g.id)}
+                >
+                  {g.nombre}
+                </button>
+                <span className="font-mono text-xs text-gris">{t.tareas.cuenta(g.tareas.length)}</span>
+              </h2>
+              <ListaTareas tareas={g.tareas} conResponsable={admin} cabecera={i === 0} />
+            </section>
+          ))}
+        </div>
       ) : (
-        <ListaTareas tareas={lista} conResponsable={admin} />
+        <ListaTareas tareas={lista} conResponsable={admin} conObra={!obra} />
       )}
     </div>
   );
 }
 
 export default function TareasPage() {
-  const estado = useSearchParams().get("estado") ?? "";
+  const params = useSearchParams();
+  const estado = params.get("estado") ?? "";
+  const obra = params.get("obra") ?? "";
   const valido = (ESTADOS as string[]).includes(estado) ? (estado as Estado) : "";
-  // La key reinicia los filtros cuando se llega con otro estado desde el tablero.
-  return <Tareas key={valido} estadoInicial={valido} />;
+  // La key reinicia los filtros cuando se llega con otro estado u otra obra desde el tablero.
+  return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} />;
 }

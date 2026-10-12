@@ -93,7 +93,7 @@ export function frase(t: Textos, e: Evento) {
 }
 
 /** Sucesos cuya nota es un dato (un nombre, una lista de campos) y no un mensaje. */
-export const SIN_MENSAJE = new Set<Evento["suceso"]>(["crear", "asignar", "reasignar", "desasignar", "editar"]);
+export const SIN_MENSAJE = new Set<Evento["suceso"]>(["crear", "asignar", "reasignar", "desasignar", "editar", "adjuntar"]);
 
 /** Nombre de quien tiene la tarea, o "Sin asignar". */
 export function useNombres() {
@@ -102,16 +102,44 @@ export function useNombres() {
   return (id: string | null) => perfiles.find((p) => p.id === id)?.nombre ?? t.comun.sinResponsable;
 }
 
+/** Nombre de la obra de una tarea, o "Sin obra". */
+export function useObras() {
+  const { obras } = useStore();
+  const { t } = useT();
+  return (id: string | null) => obras.find((o) => o.id === id)?.nombre ?? t.comun.sinObra;
+}
+
+/** Avance de una obra: barra con las tareas completadas sobre el total. */
+export function Avance({ hechas, total }: { hechas: number; total: number }) {
+  return (
+    <span className="block h-2.5 w-full bg-regla" aria-hidden>
+      <span className="block h-full bg-[var(--e-completada)]" style={{ width: `${total ? (hechas / total) * 100 : 0}%` }} />
+    </span>
+  );
+}
+
 const COLUMNAS = "lg:grid-cols-[4.5rem_minmax(0,1fr)_9rem_10.5rem_2rem_12.5rem]";
 
 /** Lista de tareas con reglas: tabla en pantallas anchas, filas apiladas en el celular. */
-export function ListaTareas({ tareas, conResponsable = false }: { tareas: Tarea[]; conResponsable?: boolean }) {
+export function ListaTareas({
+  tareas,
+  conResponsable = false,
+  conObra = false,
+  cabecera = true,
+}: {
+  tareas: Tarea[];
+  conResponsable?: boolean;
+  /** Muestra la obra bajo el título; sobra cuando la lista ya está agrupada por obra. */
+  conObra?: boolean;
+  cabecera?: boolean;
+}) {
   const { t } = useT();
   const hoy = useHoy();
   const nombre = useNombres();
+  const obra = useObras();
   return (
     <div className="border-t border-tinta">
-      <div className={`hidden gap-4 border-b border-regla py-2 lg:grid ${COLUMNAS}`}>
+      <div className={`hidden gap-4 border-b border-regla py-2 ${cabecera ? "lg:grid" : ""} ${COLUMNAS}`}>
         <span className="rotulo">{t.campos.codigo}</span>
         <span className="rotulo">{t.campos.tarea}</span>
         <span className="rotulo">{conResponsable ? t.campos.responsable : ""}</span>
@@ -127,8 +155,18 @@ export function ListaTareas({ tareas, conResponsable = false }: { tareas: Tarea[
         >
           <span className="order-1 font-mono text-xs text-gris lg:order-none">{codigoTarea(tarea.numero)}</span>
           <span className="order-3 col-span-2 min-w-0 lg:order-none lg:col-span-1">
-            <span className="block truncate font-medium underline-offset-4 group-hover:underline">{tarea.titulo}</span>
-            {conResponsable && <span className="text-sm text-gris lg:hidden">{nombre(tarea.asignadaA)}</span>}
+            <span className="block font-medium underline-offset-4 group-hover:underline lg:truncate">{tarea.titulo}</span>
+            {(conObra || conResponsable) && (
+              <span className={`block truncate text-sm text-gris ${conObra ? "" : "lg:hidden"}`}>
+                {conObra && obra(tarea.obraId)}
+                {conResponsable && (
+                  <span className="lg:hidden">
+                    {conObra && " · "}
+                    {nombre(tarea.asignadaA)}
+                  </span>
+                )}
+              </span>
+            )}
           </span>
           <span className="hidden truncate text-sm text-gris lg:block">{conResponsable && nombre(tarea.asignadaA)}</span>
           <span className="order-2 justify-self-end lg:order-none lg:justify-self-start">
@@ -207,20 +245,24 @@ export function Renglones({
   conResponsable?: boolean;
 }) {
   const nombre = useNombres();
+  const obra = useObras();
   if (tareas.length === 0) return <p className="border-t border-regla py-4 text-sm text-gris">{vacio}</p>;
   return (
     <ul className="border-t border-regla">
       {tareas.map((tarea) => (
         <li key={tarea.id} className="border-b border-regla">
-          <Link href={`/panel/tareas/${tarea.id}`} className="group flex items-start justify-between gap-4 py-3">
-            <span className="min-w-0">
-              <span className="block truncate font-medium underline-offset-4 group-hover:underline">{tarea.titulo}</span>
+          <Link href={`/panel/tareas/${tarea.id}`} className="group block py-3.5 sm:flex sm:items-start sm:justify-between sm:gap-4 sm:py-3">
+            <span className="block min-w-0">
+              <span className="block font-medium underline-offset-4 group-hover:underline sm:truncate">{tarea.titulo}</span>
               <span className="mt-0.5 flex items-center gap-2 text-sm text-gris">
-                <span className="font-mono text-xs">{codigoTarea(tarea.numero)}</span>
-                {conResponsable && <span className="truncate">· {nombre(tarea.asignadaA)}</span>}
+                <span className="shrink-0 font-mono text-xs whitespace-nowrap">{codigoTarea(tarea.numero)}</span>
+                <span className="truncate">
+                  · {obra(tarea.obraId)}
+                  {conResponsable && ` · ${nombre(tarea.asignadaA)}`}
+                </span>
               </span>
             </span>
-            <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+            <span className="mt-2 flex items-center justify-between gap-3 sm:mt-0 sm:shrink-0 sm:flex-col sm:items-end sm:gap-1.5 sm:pt-0.5">
               <Sello estado={tarea.estado} />
               <Vence tarea={tarea} />
             </span>

@@ -60,7 +60,7 @@ export default function HistorialPage() {
         completadas.length === 0 ? (
           <p className="py-10 text-center text-gris">{t.historial.sinCompletadas}</p>
         ) : (
-          <ListaTareas tareas={completadas} conResponsable={admin} />
+          <ListaTareas tareas={completadas} conResponsable={admin} conObra />
         )
       ) : actividad.length === 0 ? (
         <p className="py-10 text-center text-gris">{t.historial.vacio}</p>
@@ -69,7 +69,7 @@ export default function HistorialPage() {
           {actividad.map((e) => {
             const tarea = porId.get(e.tareaId);
             return (
-              <li key={e.id} className="grid gap-x-6 gap-y-1 border-b border-regla py-3.5 sm:grid-cols-[9.5rem_1fr]">
+              <li key={e.id} className="grid grid-cols-1 gap-x-6 gap-y-1 border-b border-regla py-3.5 sm:grid-cols-[9.5rem_1fr]">
                 <span className="font-mono text-xs text-gris sm:pt-1">{momento(e.fecha)}</span>
                 <div className="min-w-0">
                   <p>

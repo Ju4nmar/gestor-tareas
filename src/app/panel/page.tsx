@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Encabezado, Renglones, Seccion } from "@/components/ui";
+import { Avance, Encabezado, Renglones, Seccion } from "@/components/ui";
 import { sumarDias, useHoy } from "@/lib/fechas";
 import { ESPERA_ADMIN, abierta, proxima, vencida } from "@/lib/flujo";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
-import type { Estado, Tarea } from "@/lib/types";
+import type { Estado, Obra, Tarea } from "@/lib/types";
 
 /** Estados por los que pasa una tarea en marcha, para la franja del flujo. */
 const EN_MARCHA: Estado[] = ["asignada", "aclaracion", "aceptada", "en_curso", "enviada", "en_revision", "devuelta"];
@@ -53,8 +53,44 @@ function Flujo({ tareas }: { tareas: Tarea[] }) {
   );
 }
 
+/** Cada obra activa con su avance; al tocarla se abren sus tareas. */
+function Obras({ obras, tareas, hoy }: { obras: Obra[]; tareas: Tarea[]; hoy: string }) {
+  const { t } = useT();
+  return (
+    <ul className="grid grid-cols-1 gap-x-10 border-t border-regla sm:grid-cols-2">
+      {obras.map((o) => {
+        const suyas = tareas.filter((x) => x.obraId === o.id);
+        const hechas = suyas.filter((x) => x.estado === "completada").length;
+        const abiertas = suyas.filter(abierta).length;
+        const vencidas = suyas.filter((x) => vencida(x, hoy)).length;
+        return (
+          <li key={o.id} className="border-b border-regla">
+            <Link href={`/panel/tareas?obra=${o.id}`} className="group block py-4">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="truncate font-display text-lg font-bold tracking-tight underline-offset-4 group-hover:underline">
+                  {o.nombre}
+                </span>
+                <span className="shrink-0 font-mono text-xs text-gris">
+                  {hechas}/{suyas.length}
+                </span>
+              </span>
+              <span className="mt-2 block">
+                <Avance hechas={hechas} total={suyas.length} />
+              </span>
+              <span className="mt-2 block font-mono text-xs text-gris">
+                {suyas.length === 0 ? t.obras.sinTareas : t.obras.abiertas(abiertas)}
+                {vencidas > 0 && <span className="font-medium text-alerta"> · {t.obras.vencidas(vencidas)}</span>}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export default function InicioPage() {
-  const { perfil, tareas } = useStore();
+  const { perfil, tareas, obras } = useStore();
   const { t, hoyLargo } = useT();
   const hoy = useHoy();
   if (!perfil) return null;
@@ -67,6 +103,7 @@ export default function InicioPage() {
   const desde = hoy ? sumarDias(hoy, -30) : "";
   const completadas = tareas.filter((x) => x.completada && x.completada.slice(0, 10) >= desde).length;
   const nombre = perfil.nombre.split(" ")[0];
+  const enMarchaObras = obras.filter((o) => o.activa);
   const cabecera = <Encabezado rotulo={hoy ? hoyLargo(hoy) : ""} titulo={t.inicio.hola(nombre)} />;
 
   if (admin) {
@@ -81,10 +118,15 @@ export default function InicioPage() {
           <Cifra valor={vencidas.length} etiqueta={t.inicio.cifras.vencidas} tono="alerta" />
           <Cifra valor={completadas} etiqueta={t.inicio.cifras.completadas} />
         </div>
+        {enMarchaObras.length > 0 && (
+          <Seccion titulo={t.inicio.obras} cuenta={enMarchaObras.length}>
+            <Obras obras={enMarchaObras} tareas={tareas} hoy={hoy} />
+          </Seccion>
+        )}
         <Seccion titulo={t.inicio.flujo}>
           <Flujo tareas={abiertas} />
         </Seccion>
-        <div className="grid gap-12 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
           <Seccion titulo={t.inicio.esperanPorTi} cuenta={esperan.length}>
             <Renglones tareas={esperan} vacio={t.inicio.nadaPendiente} conResponsable />
           </Seccion>
@@ -117,7 +159,7 @@ export default function InicioPage() {
         <Cifra valor={vencidas.length} etiqueta={t.inicio.cifras.vencidas} tono="alerta" />
         <Cifra valor={completadas} etiqueta={t.inicio.cifras.completadas} />
       </div>
-      <div className="grid gap-12 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         <div className="space-y-10">
           {porAceptar.length + devueltas.length + enMarcha.length === 0 && (
             <Seccion titulo={t.inicio.tuTurno}>

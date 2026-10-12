@@ -28,7 +28,7 @@ export type Accion =
   | "comentar";
 
 /** Lo que puede quedar en el historial: los pasos del flujo y los cambios del administrador. */
-export type Suceso = Accion | "crear" | "asignar" | "reasignar" | "desasignar" | "editar";
+export type Suceso = Accion | "crear" | "asignar" | "reasignar" | "desasignar" | "editar" | "adjuntar";
 
 export type Perfil = {
   id: string;
@@ -43,6 +43,34 @@ export type Perfil = {
   creado: string;
 };
 
+/** Obra o trabajo al que pertenecen las tareas: un local, una casa, un apartamento. */
+export type Obra = {
+  id: string;
+  nombre: string;
+  /** Dirección o nota corta. */
+  detalle: string;
+  /** Falso = archivada: ya no se le agregan tareas. */
+  activa: boolean;
+};
+
+/** Foto, plano o documento adjunto a una tarea. */
+export type Archivo = {
+  id: string;
+  tareaId: string;
+  /** Ruta en el almacén privado; vacía en el modo de muestra. */
+  ruta: string;
+  nombre: string;
+  /** Tipo MIME: "image/jpeg", "application/pdf"… */
+  tipo: string;
+  peso: number;
+  /** Perfil de quien lo subió. */
+  subidoPor: string | null;
+  autor: string;
+  fecha: string;
+  /** Dirección para verlo. En el modo de muestra viene aquí; con sesión se pide al almacén. */
+  url?: string;
+};
+
 export type Tarea = {
   id: string;
   numero: number;
@@ -53,6 +81,7 @@ export type Tarea = {
   vence: string | null;
   /** Id del perfil responsable. */
   asignadaA: string | null;
+  obraId: string | null;
   estado: Estado;
   creada: string;
   actualizada: string;
@@ -73,7 +102,7 @@ export type Evento = {
 };
 
 /** Campos que el administrador llena al crear o editar una tarea. */
-export type DatosTarea = Pick<Tarea, "titulo" | "descripcion" | "prioridad" | "vence" | "asignadaA">;
+export type DatosTarea = Pick<Tarea, "titulo" | "descripcion" | "prioridad" | "vence" | "asignadaA" | "obraId">;
 
 /** Claves de error que devuelve la base de datos (ver supabase/schema.sql). */
 export type Fallo =
@@ -99,4 +128,9 @@ export type Fallo =
   | "credenciales"
   | "confirmar"
   | "clave"
+  | "obra"
+  | "con_tareas"
+  | "archivo"
+  | "archivo_tipo"
+  | "archivo_grande"
   | "error";

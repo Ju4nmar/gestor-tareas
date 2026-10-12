@@ -1,17 +1,19 @@
 import { sumarDias } from "./fechas";
 import { ErrorFlujo, NOTA_MAXIMA, NOTA_MINIMA, REGLAS, puede } from "./flujo";
-import type { Accion, DatosTarea, Estado, Evento, Perfil, Rol, Suceso, Tarea } from "./types";
+import type { Accion, Archivo, DatosTarea, Estado, Evento, Obra, Perfil, Rol, Suceso, Tarea } from "./types";
 
-// El modo de muestra: un equipo ficticio que vive en la pestaña del visitante.
-// Estas funciones hacen lo mismo que las de la base de datos (supabase/schema.sql),
-// con las mismas reglas de flujo.ts, pero sobre un objeto en memoria.
+// El modo de muestra: una empresa de remodelaciones ficticia que vive en la pestaña
+// del visitante. Estas funciones hacen lo mismo que las de la base de datos
+// (supabase/schema.sql), con las mismas reglas de flujo.ts, sobre un objeto en memoria.
 
 export type Base = {
   /** Perfil con el que se está viendo la muestra. */
   yo: string;
   perfiles: Perfil[];
+  obras: Obra[];
   tareas: Tarea[];
   eventos: Evento[];
+  archivos: Archivo[];
   /** Consecutivo para números de tarea e ids. */
   sec: number;
 };
@@ -55,6 +57,7 @@ export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fech
   if (datos.descripcion.length > 5000) throw new ErrorFlujo("descripcion");
   const responsable = datos.asignadaA ? b.perfiles.find((p) => p.id === datos.asignadaA && p.activo) : null;
   if (datos.asignadaA && !responsable) throw new ErrorFlujo("asignado");
+  if (datos.obraId && !b.obras.some((o) => o.id === datos.obraId)) throw new ErrorFlujo("obra");
 
   if (!id) {
     const tarea: Tarea = {
@@ -77,9 +80,10 @@ export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fech
   if (!tarea) throw new ErrorFlujo("no_existe");
   const movida = tarea.asignadaA !== datos.asignadaA;
   if (movida && tarea.estado === "completada") throw new ErrorFlujo("completada");
-  const cambios = (["titulo", "descripcion", "prioridad", "vence"] as const).filter(
+  const cambios: string[] = (["titulo", "descripcion", "prioridad", "vence"] as const).filter(
     (campo) => tarea[campo] !== (campo === "titulo" ? titulo : datos[campo]),
   );
+  if (tarea.obraId !== datos.obraId) cambios.push("obra");
   const antes = tarea.estado;
   const anterior = tarea.asignadaA;
   Object.assign(tarea, datos, { titulo, actualizada: fecha });
@@ -97,6 +101,7 @@ export function borrarTarea(b: Base, id: string) {
   if (!b.tareas.some((t) => t.id === id)) throw new ErrorFlujo("no_existe");
   b.tareas = b.tareas.filter((t) => t.id !== id);
   b.eventos = b.eventos.filter((e) => e.tareaId !== id);
+  b.archivos = b.archivos.filter((a) => a.tareaId !== id);
 }
 
 export function actuar(b: Base, id: string, accion: Accion, nota: string, fecha = ahoraIso()) {
@@ -117,6 +122,57 @@ export function actuar(b: Base, id: string, accion: Accion, nota: string, fecha 
   if (accion === "aprobar") tarea.completada = fecha;
   if (accion === "reabrir") tarea.completada = null;
   anotar(b, id, yo, accion, antes, tarea.estado, texto, fecha);
+}
+
+/** Adjunta un archivo a una tarea: el administrador o su responsable. */
+export function adjuntar(
+  b: Base,
+  tareaId: string,
+  archivo: Pick<Archivo, "nombre" | "tipo" | "peso" | "url">,
+  fecha = ahoraIso(),
+) {
+  const yo = b.perfiles.find((p) => p.id === b.yo && p.activo);
+  const tarea = b.tareas.find((t) => t.id === tareaId);
+  if (!yo || !tarea || (tarea.asignadaA !== yo.id && yo.rol !== "admin")) throw new ErrorFlujo("permiso");
+  b.archivos.unshift({
+    ...archivo,
+    id: `a${++b.sec}`,
+    tareaId,
+    ruta: "",
+    subidoPor: yo.id,
+    autor: yo.nombre,
+    fecha,
+  });
+  tarea.actualizada = fecha;
+  anotar(b, tareaId, yo, "adjuntar", tarea.estado, tarea.estado, archivo.nombre, fecha);
+}
+
+export function quitarArchivo(b: Base, id: string) {
+  const yo = b.perfiles.find((p) => p.id === b.yo && p.activo);
+  const archivo = b.archivos.find((a) => a.id === id);
+  if (!archivo) throw new ErrorFlujo("no_existe");
+  if (!yo || (yo.rol !== "admin" && archivo.subidoPor !== yo.id)) throw new ErrorFlujo("permiso");
+  b.archivos = b.archivos.filter((a) => a.id !== id);
+}
+
+export function guardarObra(b: Base, id: string | null, nombre: string, detalle: string, activa: boolean) {
+  administrador(b);
+  if (nombre.trim().length < 2 || nombre.trim().length > 80) throw new ErrorFlujo("nombre");
+  if (!id) {
+    const obra: Obra = { id: `o${++b.sec}`, nombre: nombre.trim(), detalle: detalle.trim(), activa: true };
+    b.obras.push(obra);
+    return obra.id;
+  }
+  const obra = b.obras.find((o) => o.id === id);
+  if (!obra) throw new ErrorFlujo("no_existe");
+  Object.assign(obra, { nombre: nombre.trim(), detalle: detalle.trim(), activa });
+  return id;
+}
+
+export function borrarObra(b: Base, id: string) {
+  administrador(b);
+  if (b.tareas.some((t) => t.obraId === id)) throw new ErrorFlujo("con_tareas");
+  b.obras = b.obras.filter((o) => o.id !== id);
 }
 
 export function invitar(b: Base, nombre: string, email: string, rol: Rol) {
@@ -166,6 +222,8 @@ export function quitarInvitacion(b: Base, id: string) {
 
 type Par = [es: string, en: string];
 type PasoDemo = [accion: Accion, diasAtras: number, nota?: Par];
+/** Foto de muestra (Unsplash, licencia libre): quién la sube y hace cuántos días. */
+type FotoDemo = [id: string, nombre: Par, de: "admin" | "responsable", diasAtras: number];
 type TareaDemo = {
   titulo: Par;
   descripcion: Par;
@@ -174,72 +232,95 @@ type TareaDemo = {
   vence: number | null;
   /** Posición en el equipo (1 a 3), o 0 si queda sin asignar. */
   para: number;
+  /** Posición de la obra (1 a 3). */
+  obra: number;
   creada: number;
   pasos: PasoDemo[];
+  fotos?: FotoDemo[];
 };
+
+const OBRAS: [nombre: Par, detalle: Par][] = [
+  [
+    ["Local Calle 85", "85th Street shop"],
+    ["Local comercial · Calle 85 # 12-40", "Retail unit · 85th Street"],
+  ],
+  [
+    ["Apartamento Rosales 402", "Rosales apartment 402"],
+    ["Remodelación de cocina y baños", "Kitchen and bathroom remodel"],
+  ],
+  [
+    ["Casa Cedritos", "Cedritos house"],
+    ["Pisos, pintura y terraza", "Floors, paint and terrace"],
+  ],
+];
 
 const TAREAS: TareaDemo[] = [
   {
-    titulo: ["Organizar el archivo de facturas", "Organise the invoice archive"],
+    titulo: ["Demoler el muro de la cocina", "Demolish the kitchen wall"],
     descripcion: [
-      "Separar las facturas del año por mes y proveedor, y subir las escaneadas a la carpeta compartida.",
-      "Sort this year's invoices by month and supplier, and upload the scanned ones to the shared folder.",
+      "Tumbar el muro que separa cocina y comedor. Cuidado con la tubería de gas del costado izquierdo.",
+      "Take down the wall between kitchen and dining room. Mind the gas pipe on the left side.",
     ],
-    prioridad: "baja",
+    prioridad: "alta",
     vence: -10,
-    para: 2,
+    para: 1,
+    obra: 2,
     creada: 18,
     pasos: [
       ["aceptar", 17],
       ["iniciar", 16],
-      ["enviar", 13, ["Quedaron en la carpeta «Facturas 2026».", "They are in the “Invoices 2026” folder."]],
+      ["enviar", 13, ["Muro abajo y escombro retirado.", "Wall down and debris removed."]],
       ["aprobar", 12],
     ],
   },
   {
-    titulo: ["Llamar a proveedores de empaques", "Call the packaging suppliers"],
+    titulo: ["Instalar drywall del cielo raso", "Install the drywall ceiling"],
     descripcion: [
-      "Pedir tres cotizaciones de cajas y bolsas con el logo. Necesitamos precio por 500 y por 1.000 unidades.",
-      "Get three quotes for branded boxes and bags. We need prices for 500 and for 1,000 units.",
+      "Cielo raso en drywall para toda el área de ventas, a 2,80 m. Dejar listas las salidas de las lámparas.",
+      "Drywall ceiling across the sales floor, at 2.80 m. Leave the lamp outlets ready.",
     ],
-    prioridad: "baja",
+    prioridad: "media",
     vence: -6,
-    para: 1,
+    para: 2,
+    obra: 1,
     creada: 12,
     pasos: [
       ["aceptar", 11],
       ["iniciar", 9],
-      ["enviar", 5, ["Adjunto las tres cotizaciones en el correo.", "The three quotes are attached in the email."]],
-      ["aprobar", 5, ["Gracias. Nos quedamos con la segunda.", "Thanks. We are going with the second one."]],
+      ["enviar", 5, ["Terminado. Faltó masillar una junta, quedó para mañana.", "Done. One joint still needs filler, left for tomorrow."]],
+      ["aprobar", 5, ["Quedó bien. Gracias.", "Looks good. Thanks."]],
     ],
   },
   {
-    titulo: ["Informe de ventas de septiembre", "September sales report"],
+    titulo: ["Pintar sala y comedor", "Paint the living and dining room"],
     descripcion: [
-      "Ventas por línea de producto y por vendedor, comparadas con agosto. Una página, con las tres conclusiones arriba.",
-      "Sales by product line and by salesperson, compared with August. One page, with the three takeaways at the top.",
+      "Dos manos de blanco hueso en paredes y blanco puro en techos. Proteger el piso de madera.",
+      "Two coats of off-white on walls and pure white on ceilings. Protect the wooden floor.",
     ],
     prioridad: "media",
     vence: -3,
     para: 3,
+    obra: 3,
     creada: 10,
     pasos: [
       ["aceptar", 9],
       ["iniciar", 8],
       ["enviar", 5],
       ["revisar", 4],
-      ["aprobar", 4, ["Muy claro. Lo presento el lunes.", "Very clear. I will present it on Monday."]],
+      ["aprobar", 4, ["Muy buen acabado.", "Very good finish."]],
     ],
+    fotos: [["1717281234297-3def5ae3eee1", ["Pintura del techo.jpg", "Ceiling painting.jpg"], "responsable", 5]],
   },
   {
-    titulo: ["Conciliar la caja de la semana", "Reconcile this week's cash register"],
+    titulo: ["Enchapar el baño principal", "Tile the main bathroom"],
     descripcion: [
-      "Cuadrar los cierres diarios contra los extractos del banco y dejar anotadas las diferencias.",
-      "Match the daily closings against the bank statements and note any differences.",
+      "Enchape de piso y paredes con la cerámica gris que ya está en obra. Juntas de 2 mm.",
+      "Tile floor and walls with the grey ceramic already on site. 2 mm joints.",
     ],
     prioridad: "urgente",
     vence: -1,
     para: 1,
+    obra: 2,
     creada: 5,
     pasos: [
       ["aceptar", 5],
@@ -247,31 +328,34 @@ const TAREAS: TareaDemo[] = [
     ],
   },
   {
-    titulo: ["Inventario de bodega", "Warehouse stock count"],
+    titulo: ["Instalar puntos eléctricos de la barra", "Install the electrical points for the bar"],
     descripcion: [
-      "Contar las referencias de la estantería A y B y actualizar la hoja de inventario.",
-      "Count the items on shelves A and B and update the stock sheet.",
+      "Seis tomas dobles y dos salidas para lámparas colgantes, según el plano adjunto.",
+      "Six double sockets and two outlets for pendant lamps, as shown in the attached plan.",
     ],
     prioridad: "alta",
     vence: 0,
     para: 2,
+    obra: 1,
     creada: 6,
     pasos: [
       ["aceptar", 6],
       ["iniciar", 4],
       ["enviar", 2],
-      ["devolver", 1, ["Falta la estantería B completa. Revísala y vuelve a enviar.", "Shelf B is missing entirely. Check it and submit again."]],
+      ["devolver", 1, ["Faltan las dos salidas de las lámparas. Revisa el plano y vuelve a enviar.", "The two lamp outlets are missing. Check the plan and submit again."]],
     ],
+    fotos: [["1721244654394-36a7bc2da288", ["Plano.jpg", "Plan.jpg"], "admin", 6]],
   },
   {
-    titulo: ["Cotización para Ferretería El Roble", "Quote for El Roble Hardware"],
+    titulo: ["Cotizar el piso laminado", "Quote the laminate flooring"],
     descripcion: [
-      "Piden 40 cajas de tornillería surtida y entrega en dos semanas. Incluir el descuento por volumen.",
-      "They want 40 boxes of assorted screws delivered in two weeks. Include the volume discount.",
+      "Son 62 m². Pedir precio en dos proveedores, con instalación y guardaescobas.",
+      "It is 62 m². Get prices from two suppliers, including installation and skirting.",
     ],
     prioridad: "alta",
     vence: 1,
     para: 1,
+    obra: 3,
     creada: 3,
     pasos: [
       ["aceptar", 2],
@@ -279,95 +363,108 @@ const TAREAS: TareaDemo[] = [
     ],
   },
   {
-    titulo: ["Fotos del nuevo local para redes", "Photos of the new shop for social media"],
+    titulo: ["Fotos del avance de la fachada", "Progress photos of the shop front"],
     descripcion: [
-      "Diez fotos del local ya organizado: fachada, vitrina y mostrador. Con buena luz, en la mañana.",
-      "Ten photos of the finished shop: front, window and counter. In good morning light.",
+      "Tomar fotos de la fachada ya con el vidrio instalado, de frente y desde la esquina.",
+      "Take photos of the front with the glass installed, head-on and from the corner.",
     ],
     prioridad: "media",
     vence: 2,
     para: 2,
+    obra: 1,
     creada: 4,
     pasos: [
       ["aceptar", 4],
       ["iniciar", 2],
-      ["enviar", 0, ["Subí 14 fotos a la carpeta. Las mejores son la 3, la 7 y la 11.", "I uploaded 14 photos to the folder. The best are 3, 7 and 11."]],
+      ["enviar", 0, ["Subí dos fotos. El vidrio de la izquierda llega el jueves.", "I uploaded two photos. The left glass panel arrives on Thursday."]],
+    ],
+    fotos: [
+      ["1704742950992-9815a104820c", ["Estructura interior.jpg", "Interior framing.jpg"], "responsable", 0],
+      ["1736182615481-3795ea557614", ["Avance del local.jpg", "Shop progress.jpg"], "responsable", 0],
     ],
   },
   {
-    titulo: ["Actualizar la lista de precios", "Update the price list"],
+    titulo: ["Cambiar la grifería de la cocina", "Replace the kitchen taps"],
     descripcion: [
-      "Subir los precios de la línea de pinturas según la nueva lista del proveedor.",
-      "Raise the prices of the paint line according to the supplier's new list.",
+      "Cambiar la grifería del lavaplatos y revisar que no haya fugas en el sifón.",
+      "Replace the sink taps and check the trap for leaks.",
     ],
-    prioridad: "alta",
+    prioridad: "media",
     vence: 3,
     para: 3,
+    obra: 2,
     creada: 2,
     pasos: [
       [
         "aclarar",
         1,
-        ["¿El aumento aplica también para los pedidos que ya están cotizados?", "Does the increase also apply to orders that are already quoted?"],
+        ["¿Instalo la grifería que dejó el cliente o hay que comprar una nueva?", "Do I install the taps the client left, or do we buy new ones?"],
       ],
     ],
   },
   {
-    titulo: ["Diseñar el volante de descuentos", "Design the discount flyer"],
+    titulo: ["Resanar y estucar paredes", "Patch and plaster the walls"],
     descripcion: [
-      "Volante media carta para la promoción de fin de mes. Usar los colores de la marca y dejar espacio para el código QR.",
-      "Half-letter flyer for the end-of-month promotion. Use the brand colours and leave room for the QR code.",
+      "Resanar grietas del segundo piso y estucar las tres habitaciones antes de pintar.",
+      "Patch the cracks on the second floor and plaster the three bedrooms before painting.",
     ],
     prioridad: "media",
     vence: 4,
     para: 3,
+    obra: 3,
     creada: 5,
     pasos: [
       ["aceptar", 5],
       ["iniciar", 4],
-      ["enviar", 1, ["Van dos versiones: una clara y una oscura.", "Two versions: one light and one dark."]],
+      ["enviar", 1, ["Listas las tres habitaciones.", "All three bedrooms are done."]],
       ["revisar", 0],
     ],
+    fotos: [["1618832515490-e181c4794a45", ["Protección antes de pintar.jpg", "Covered before painting.jpg"], "responsable", 1]],
   },
   {
-    titulo: ["Publicar el catálogo de noviembre", "Publish the November catalogue"],
+    titulo: ["Instalar las puertas de vidrio", "Install the glass doors"],
     descripcion: [
-      "Cargar los productos nuevos en la tienda en línea, con foto, precio y existencias.",
-      "Load the new products into the online store, with photo, price and stock.",
+      "Dos puertas batientes de vidrio templado en la entrada. El proveedor entrega el miércoles en la mañana.",
+      "Two tempered-glass swing doors at the entrance. The supplier delivers on Wednesday morning.",
     ],
     prioridad: "media",
     vence: 5,
     para: 2,
+    obra: 1,
     creada: 0,
     pasos: [],
   },
   {
-    titulo: ["Capacitación de la nueva cajera", "Train the new cashier"],
+    titulo: ["Impermeabilizar la terraza", "Waterproof the terrace"],
     descripcion: [
-      "Dos mañanas: apertura y cierre de caja, devoluciones y el sistema de facturación.",
-      "Two mornings: opening and closing the register, returns and the invoicing system.",
+      "Limpiar, aplicar manto líquido en dos capas y probar con agua durante 24 horas.",
+      "Clean, apply two coats of liquid membrane and water-test for 24 hours.",
     ],
     prioridad: "media",
     vence: 7,
     para: 1,
+    obra: 3,
     creada: 1,
     pasos: [["aceptar", 1]],
   },
   {
-    titulo: ["Renovar el dominio del sitio", "Renew the website domain"],
+    titulo: ["Comprar materiales de plomería", "Buy the plumbing materials"],
     descripcion: [
-      "Vence el mes que viene. Revisar si conviene pagar dos años.",
-      "It expires next month. Check whether paying for two years is worth it.",
+      "Lista pendiente: tubería de media, codos, uniones y dos válvulas de paso.",
+      "Pending list: half-inch pipe, elbows, couplings and two stop valves.",
     ],
     prioridad: "baja",
     vence: 12,
     para: 0,
+    obra: 2,
     creada: 1,
     pasos: [],
   },
 ];
 
-/** Arma el equipo y las tareas de muestra con fechas relativas a hoy. */
+const fotoDemo = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&q=70`;
+
+/** Arma el equipo, las obras y las tareas de muestra con fechas relativas a hoy. */
 export function semilla(idioma: "es" | "en", hoy: string): Base {
   const i = idioma === "es" ? 0 : 1;
   const persona = (id: string, nombre: string, rol: Rol, activa = true): Perfil => ({
@@ -389,8 +486,10 @@ export function semilla(idioma: "es" | "en", hoy: string): Base {
       persona("p3", "Andrés Peña", "empleado"),
       persona("p4", "Sofía Mejía", "empleado", false),
     ],
+    obras: OBRAS.map(([nombre, detalle], n) => ({ id: `o${n + 1}`, nombre: nombre[i], detalle: detalle[i], activa: true })),
     tareas: [],
     eventos: [],
+    archivos: [],
     sec: 0,
   };
   // La hora avanza con cada paso para que el historial quede en orden.
@@ -402,6 +501,7 @@ export function semilla(idioma: "es" | "en", hoy: string): Base {
       : `${sumarDias(hoy, -diasAtras)}T${String(13 + (minuto % 6)).padStart(2, "0")}:${String((minuto++ * 7) % 60).padStart(2, "0")}:00.000Z`;
 
   for (const d of TAREAS) {
+    const responsable = `p${d.para}`;
     b.yo = "admin";
     const id = guardarTarea(
       b,
@@ -410,15 +510,24 @@ export function semilla(idioma: "es" | "en", hoy: string): Base {
         descripcion: d.descripcion[i],
         prioridad: d.prioridad,
         vence: d.vence === null ? null : sumarDias(hoy, d.vence),
-        asignadaA: d.para ? `p${d.para}` : null,
+        asignadaA: d.para ? responsable : null,
+        obraId: `o${d.obra}`,
       },
       null,
       momento(d.creada),
     );
-    for (const [accion, diasAtras, nota] of d.pasos) {
-      b.yo = REGLAS[accion].quien === "admin" ? "admin" : `p${d.para}`;
-      actuar(b, id, accion, nota?.[i] ?? "", momento(diasAtras));
-    }
+    // Los pasos y las fotos se aplican en orden de fecha, del más viejo al más reciente.
+    const sucesos = [
+      ...d.pasos.map(([accion, dias, nota]) => ({ dias, orden: 1, hacer: () => {
+        b.yo = REGLAS[accion].quien === "admin" ? "admin" : responsable;
+        actuar(b, id, accion, nota?.[i] ?? "", momento(dias));
+      } })),
+      ...(d.fotos ?? []).map(([foto, nombre, de, dias]) => ({ dias, orden: 0, hacer: () => {
+        b.yo = de === "admin" ? "admin" : responsable;
+        adjuntar(b, id, { nombre: nombre[i], tipo: "image/jpeg", peso: 240_000, url: fotoDemo(foto) }, momento(dias));
+      } })),
+    ].sort((x, y) => y.dias - x.dias || x.orden - y.orden);
+    for (const s of sucesos) s.hacer();
   }
   // Lo más reciente primero, como lo entrega la base de datos.
   b.eventos.sort((x, y) => y.fecha.localeCompare(x.fecha));

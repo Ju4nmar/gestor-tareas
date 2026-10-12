@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Encabezado, Seccion, useNombres } from "@/components/ui";
+import { Encabezado, Seccion, useNombres, useObras } from "@/components/ui";
 import { fechaLocal, sumarDias, useHoy } from "@/lib/fechas";
 import { ESTADOS, PRIORIDADES, abierta, codigoTarea, vencida } from "@/lib/flujo";
 import { useStore } from "@/lib/store";
@@ -32,10 +32,11 @@ function Barra({ etiqueta, valor, maximo, color }: { etiqueta: string; valor: nu
 }
 
 export default function InformesPage() {
-  const { perfil, tareas, eventos, perfiles } = useStore();
+  const { perfil, tareas, eventos, perfiles, obras } = useStore();
   const { t, diaLargo } = useT();
   const hoy = useHoy();
   const nombre = useNombres();
+  const obra = useObras();
   const [periodo, setPeriodo] = useState("30");
   if (!perfil || perfil.rol !== "admin") return null;
 
@@ -77,6 +78,20 @@ export default function InformesPage() {
     })
     .filter((f) => f.abiertas + f.hechas > 0 || (f.p.activo && f.p.rol === "empleado"));
 
+  const porObra = [...obras.map((o) => ({ id: o.id as string | null, nombre: o.nombre })), { id: null, nombre: t.comun.sinObra }]
+    .map((o) => {
+      const suyas = tareas.filter((x) => x.obraId === o.id);
+      return {
+        ...o,
+        total: suyas.length,
+        abiertas: suyas.filter(abierta).length,
+        hechas: suyas.filter((x) => enPeriodo(x.completada)).length,
+        vencidas: suyas.filter((x) => vencida(x, hoy)).length,
+        avance: suyas.length ? `${Math.round((suyas.filter((x) => x.estado === "completada").length / suyas.length) * 100)}%` : "—",
+      };
+    })
+    .filter((f) => f.total > 0);
+
   const porEstado = ESTADOS.map((e) => ({ e, n: tareas.filter((x) => x.estado === e).length }));
   const abiertas = tareas.filter(abierta);
   const porPrioridad = PRIORIDADES.map((p) => ({ p, n: abiertas.filter((x) => x.prioridad === p).length }));
@@ -84,9 +99,10 @@ export default function InformesPage() {
   const descargar = () => {
     const celda = (v: string | number | null) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const filas = [
-      [t.campos.codigo, t.campos.titulo, t.campos.estado, t.campos.prioridad, t.campos.responsable, t.campos.vence, t.campos.creada, t.informes.completadas],
+      [t.campos.codigo, t.campos.obra, t.campos.titulo, t.campos.estado, t.campos.prioridad, t.campos.responsable, t.campos.vence, t.campos.creada, t.informes.completadas],
       ...tareas.map((x) => [
         codigoTarea(x.numero),
+        obra(x.obraId),
         x.titulo,
         t.estados[x.estado],
         t.prioridades[x.prioridad],
@@ -167,7 +183,36 @@ export default function InformesPage() {
         )}
       </Seccion>
 
-      <div className="grid gap-12 lg:grid-cols-2">
+      {porObra.length > 0 && (
+        <Seccion titulo={t.informes.porObra}>
+          <div className="overflow-x-auto border-t border-tinta">
+            <table className="w-full min-w-[34rem] text-sm">
+              <thead>
+                <tr className="border-b border-regla text-left">
+                  {[t.campos.obra, t.informes.abiertas, t.informes.completadas, t.informes.vencidas, t.obras.avanceCorto].map((c, i) => (
+                    <th key={c} className={`rotulo py-2 font-normal ${i > 0 ? "text-right" : ""}`}>
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {porObra.map((f) => (
+                  <tr key={f.id ?? "ninguna"} className="border-b border-regla">
+                    <td className="py-3 font-medium">{f.nombre}</td>
+                    <td className="text-right font-mono">{f.abiertas}</td>
+                    <td className="text-right font-mono">{f.hechas}</td>
+                    <td className={`text-right font-mono ${f.vencidas ? "font-medium text-alerta" : ""}`}>{f.vencidas}</td>
+                    <td className="text-right font-mono">{f.avance}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Seccion>
+      )}
+
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
         <Seccion titulo={t.informes.porEstado}>
           <div className="border-t border-regla pt-2">
             {porEstado.map(({ e, n }) => (

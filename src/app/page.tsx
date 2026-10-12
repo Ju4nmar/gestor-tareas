@@ -139,7 +139,7 @@ export default function EntradaPage() {
 
               <div className="mt-10 border-t border-tinta pt-5">
                 <p className="rotulo">{t.entrada.demo}</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <button type="button" className="btn btn-linea" onClick={() => demo("admin")}>
                     {t.entrada.demoAdmin}
                   </button>

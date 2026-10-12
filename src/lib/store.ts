@@ -7,7 +7,7 @@ import { fechaLocal } from "./fechas";
 import { ErrorFlujo } from "./flujo";
 import { supabase } from "./supabase";
 import { idiomaActual } from "./textos";
-import type { Accion, DatosTarea, Evento, Fallo, Perfil, Rol, Tarea } from "./types";
+import type { Accion, Archivo, DatosTarea, Evento, Fallo, Obra, Perfil, Rol, Tarea } from "./types";
 
 // Estado compartido. Con sesión, los datos vienen de Supabase y cada cambio pasa
 // por una función de la base de datos; en el modo de muestra todo ocurre en la
@@ -28,6 +28,8 @@ export type State = {
   tareas: Tarea[];
   eventos: Evento[];
   perfiles: Perfil[];
+  obras: Obra[];
+  archivos: Archivo[];
 };
 
 const initial: State = {
@@ -41,6 +43,8 @@ const initial: State = {
   tareas: [],
   eventos: [],
   perfiles: [],
+  obras: [],
+  archivos: [],
 };
 
 let state = initial;
@@ -108,6 +112,8 @@ function ponerDemo(b: demo.Base) {
     tareas,
     eventos: b.eventos.filter((e) => visibles.has(e.tareaId)),
     perfiles: admin ? b.perfiles : b.perfiles.filter((p) => p.id === b.yo),
+    obras: admin ? b.obras : b.obras.filter((o) => tareas.some((t) => t.obraId === o.id)),
+    archivos: b.archivos.filter((a) => visibles.has(a.tareaId)),
   });
 }
 
@@ -169,6 +175,7 @@ type FilaTarea = {
   priority: Tarea["prioridad"];
   due_date: string | null;
   assignee_id: string | null;
+  project_id: string | null;
   status: Tarea["estado"];
   created_at: string;
   updated_at: string;
@@ -183,6 +190,7 @@ const aTarea = (f: FilaTarea): Tarea => ({
   prioridad: f.priority,
   vence: f.due_date,
   asignadaA: f.assignee_id,
+  obraId: f.project_id,
   estado: f.status,
   creada: f.created_at,
   actualizada: f.updated_at,
@@ -215,21 +223,55 @@ const aEvento = (f: FilaEvento): Evento => ({
   nota: f.note,
 });
 
-/** Trae tareas, historial y equipo. La base de datos entrega solo lo que esa persona puede ver. */
+type FilaObra = { id: string; name: string; detail: string; active: boolean };
+
+const aObra = (f: FilaObra): Obra => ({ id: f.id, nombre: f.name, detalle: f.detail, activa: f.active });
+
+type FilaArchivo = {
+  id: string;
+  task_id: string;
+  path: string;
+  name: string;
+  mime: string;
+  size: number;
+  uploaded_by: string | null;
+  uploader_name: string;
+  created_at: string;
+};
+
+const aArchivo = (f: FilaArchivo): Archivo => ({
+  id: f.id,
+  tareaId: f.task_id,
+  ruta: f.path,
+  nombre: f.name,
+  tipo: f.mime,
+  peso: f.size,
+  subidoPor: f.uploaded_by,
+  autor: f.uploader_name,
+  fecha: f.created_at,
+});
+
+/** Trae tareas, historial, equipo, obras y archivos. La base de datos entrega solo lo que esa persona puede ver. */
 export async function recargar() {
   if (state.demo || !state.perfil) return;
-  const [tareas, eventos, perfiles] = await Promise.all([
+  const [tareas, eventos, perfiles, obras, archivos] = await Promise.all([
     supabase.from("tm_tasks").select("*").order("number", { ascending: false }),
     supabase.from("tm_events").select("*").order("id", { ascending: false }).limit(3000),
     supabase.from("tm_profiles").select("*").order("name"),
+    supabase.from("tm_projects").select("*").order("created_at"),
+    supabase.from("tm_files").select("*").order("created_at", { ascending: false }),
   ]);
-  if (tareas.error || eventos.error || perfiles.error) return set({ cargado: true, error: true });
+  if (tareas.error || eventos.error || perfiles.error || obras.error || archivos.error) {
+    return set({ cargado: true, error: true });
+  }
   set({
     cargado: true,
     error: false,
     tareas: (tareas.data as FilaTarea[]).map(aTarea),
     eventos: (eventos.data as FilaEvento[]).map(aEvento),
     perfiles: (perfiles.data as FilaPerfil[]).map(aPerfil),
+    obras: (obras.data as FilaObra[]).map(aObra),
+    archivos: (archivos.data as FilaArchivo[]).map(aArchivo),
   });
 }
 
@@ -281,6 +323,9 @@ const FALLOS = new Set<string>([
   "invitacion",
   "ya_activa",
   "sesion",
+  "obra",
+  "con_tareas",
+  "archivo",
 ]);
 
 async function rpc<T>(nombre: string, args: Record<string, unknown>) {
@@ -313,6 +358,7 @@ export const guardarTarea = (datos: DatosTarea, id: string | null = null) =>
         p_priority: datos.prioridad,
         p_due: datos.vence,
         p_assignee: datos.asignadaA,
+        p_project: datos.obraId,
       }),
     (b) => demo.guardarTarea(b, datos, id),
   );
@@ -351,6 +397,112 @@ export const quitarInvitacion = (id: string) =>
     () => rpc<void>("tm_remove_invite", { p_id: id }),
     (b) => demo.quitarInvitacion(b, id),
   );
+
+/** Crea la obra (sin `id`) o cambia su nombre, detalle o estado. */
+export const guardarObra = (id: string | null, nombre: string, detalle: string, activa = true) =>
+  cambiar(
+    () => rpc<string>("tm_save_project", { p_id: id, p_name: nombre, p_detail: detalle, p_active: activa }),
+    (b) => demo.guardarObra(b, id, nombre, detalle, activa),
+  );
+
+export const borrarObra = (id: string) =>
+  cambiar(
+    () => rpc<void>("tm_delete_project", { p_id: id }),
+    (b) => demo.borrarObra(b, id),
+  );
+
+// --- Fotos y archivos -------------------------------------------------------
+
+const ALMACEN = "tareas";
+const PESO_MAXIMO = 15 * 1024 * 1024;
+
+/**
+ * Deja el archivo listo para subir. Las fotos se reducen y se pasan a JPEG: las de
+ * un celular pesan varios megas y así suben rápido incluso con mala señal.
+ */
+async function preparar(file: File, lado: number) {
+  if (file.type === "application/pdf") {
+    if (file.size > PESO_MAXIMO) throw new ErrorFlujo("archivo_grande");
+    return { blob: file as Blob, nombre: file.name, tipo: file.type };
+  }
+  if (!file.type.startsWith("image/")) throw new ErrorFlujo("archivo_tipo");
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const escala = Math.min(1, lado / Math.max(img.width, img.height));
+      const lienzo = document.createElement("canvas");
+      lienzo.width = Math.round(img.width * escala);
+      lienzo.height = Math.round(img.height * escala);
+      lienzo.getContext("2d")!.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      URL.revokeObjectURL(img.src);
+      lienzo.toBlob((b) => (b ? resolve(b) : reject(new ErrorFlujo("archivo_tipo"))), "image/jpeg", 0.82);
+    };
+    img.onerror = () => reject(new ErrorFlujo("archivo_tipo"));
+    img.src = URL.createObjectURL(file);
+  });
+  return { blob, nombre: file.name.replace(/\.[^.]+$/, "") + ".jpg", tipo: "image/jpeg" };
+}
+
+const comoDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => resolve(String(lector.result));
+    lector.onerror = () => reject(new ErrorFlujo("archivo"));
+    lector.readAsDataURL(blob);
+  });
+
+/** Sube fotos o PDF y los deja adjuntos a la tarea. */
+export async function subirArchivos(tareaId: string, files: File[]) {
+  for (const file of files) {
+    if (state.demo && base) {
+      // En la muestra la foto se guarda pequeña en la pestaña; un PDF solo queda con su nombre.
+      const { blob, nombre, tipo } = await preparar(file, 900);
+      const url = tipo === "image/jpeg" ? await comoDataUrl(blob) : undefined;
+      const copia = structuredClone(base);
+      demo.adjuntar(copia, tareaId, { nombre, tipo, peso: blob.size, url });
+      ponerDemo(copia);
+      continue;
+    }
+    const { blob, nombre, tipo } = await preparar(file, 1800);
+    const ruta = `${tareaId}/${crypto.randomUUID()}.${tipo === "image/jpeg" ? "jpg" : "pdf"}`;
+    const { error } = await supabase.storage.from(ALMACEN).upload(ruta, blob, { contentType: tipo });
+    if (error) throw new ErrorFlujo("archivo");
+    await rpc("tm_add_file", { p_task: tareaId, p_path: ruta, p_name: nombre, p_mime: tipo, p_size: blob.size });
+  }
+  await recargar();
+}
+
+export const quitarArchivo = (id: string) =>
+  cambiar(
+    async () => {
+      const ruta = await rpc<string>("tm_remove_file", { p_id: id });
+      // Si el borrado del almacén falla, el archivo queda huérfano pero ya no se ve en ninguna parte.
+      await supabase.storage.from(ALMACEN).remove([ruta]);
+    },
+    (b) => demo.quitarArchivo(b, id),
+  );
+
+// Direcciones temporales ya pedidas, para no pedirlas en cada pintado.
+const firmadas = new Map<string, { url: string; hasta: number }>();
+
+/**
+ * Dirección para ver cada archivo, por id. El almacén es privado: entrega enlaces
+ * que duran una hora y solo a quien puede ver la tarea.
+ */
+export async function urlsDe(archivos: Archivo[]) {
+  const ahora = Date.now();
+  const pendientes = archivos.filter((a) => !a.url && a.ruta && !((firmadas.get(a.ruta)?.hasta ?? 0) > ahora));
+  if (pendientes.length) {
+    const { data } = await supabase.storage.from(ALMACEN).createSignedUrls(
+      pendientes.map((a) => a.ruta),
+      3600,
+    );
+    for (const f of data ?? []) {
+      if (f.path && f.signedUrl) firmadas.set(f.path, { url: f.signedUrl, hasta: ahora + 50 * 60_000 });
+    }
+  }
+  return Object.fromEntries(archivos.map((a) => [a.id, a.url ?? firmadas.get(a.ruta)?.url ?? ""]));
+}
 
 // --- Cuenta -----------------------------------------------------------------
 

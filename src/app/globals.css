@@ -93,8 +93,10 @@ body {
     color: #16130e;
     @apply px-1.5;
   }
+  /* En el celular los botones y los campos son más altos, para tocarlos con el dedo,
+     y el texto de los campos es de 16px para que el teléfono no acerque la pantalla. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-[3px] border border-tinta bg-tinta px-4 py-2.5 text-sm font-semibold text-papel transition-all duration-150 hover:-translate-y-px hover:shadow-[3px_3px_0_var(--marca)] active:translate-y-0 active:shadow-none disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-[3px] border border-tinta bg-tinta px-4 py-2.5 text-[15px] sm:min-h-0 sm:text-sm font-semibold text-papel transition-all duration-150 hover:-translate-y-px hover:shadow-[3px_3px_0_var(--marca)] active:translate-y-0 active:shadow-none disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-linea {
     @apply bg-transparent text-tinta hover:bg-tinta hover:text-papel hover:shadow-none;
@@ -103,7 +105,7 @@ body {
     @apply border-transparent bg-transparent px-2 text-gris hover:translate-y-0 hover:text-tinta hover:shadow-none;
   }
   .campo {
-    @apply w-full rounded-[3px] border border-tinta/30 bg-hoja px-3 py-2.5 text-[15px] text-tinta outline-none transition-shadow placeholder:text-gris/60 focus:border-tinta focus:shadow-[3px_3px_0_var(--marca)];
+    @apply w-full rounded-[3px] border border-tinta/30 bg-hoja px-3 py-3 text-base text-tinta outline-none sm:py-2.5 sm:text-[15px] transition-shadow placeholder:text-gris/60 focus:border-tinta focus:shadow-[3px_3px_0_var(--marca)];
   }
   .etiqueta {
     @apply mb-1.5 block font-mono text-[11px] uppercase tracking-[0.09em] text-gris;

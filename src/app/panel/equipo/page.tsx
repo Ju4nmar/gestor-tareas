@@ -67,7 +67,7 @@ export default function EquipoPage() {
       )}
 
       <Seccion titulo={t.equipo.invitar}>
-        <form onSubmit={crear} className="hoja grid gap-4 p-5 sm:grid-cols-[1fr_1.2fr_10rem_auto] sm:items-end">
+        <form onSubmit={crear} className="hoja grid grid-cols-1 gap-4 p-5 sm:grid-cols-[1fr_1.2fr_10rem_auto] sm:items-end">
           <div>
             <label className="etiqueta" htmlFor="nombre">
               {t.equipo.nombre}

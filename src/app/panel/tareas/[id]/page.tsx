@@ -1,22 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { Elegidos, Elegir, Galeria } from "@/components/Archivos";
 import { TareaForm } from "@/components/TareaForm";
-import { Barras, SIN_MENSAJE, Sello, Vence, falloDe, frase, useNombres } from "@/components/ui";
+import { Barras, SIN_MENSAJE, Sello, Vence, falloDe, frase, useNombres, useObras } from "@/components/ui";
 import { ESPERA_ADMIN, NOTA_MAXIMA, NOTA_MINIMA, REGLAS, codigoTarea, pasosDisponibles } from "@/lib/flujo";
-import { actuar, borrarTarea, useStore } from "@/lib/store";
+import { actuar, borrarTarea, subirArchivos, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Accion, Evento, Perfil, Tarea } from "@/lib/types";
 
 /** Los pasos que esa persona puede dar ahora, o a quién se está esperando. */
-function Pasos({ tarea, perfil }: { tarea: Tarea; perfil: Perfil }) {
+function Pasos({ tarea, perfil, onHecho }: { tarea: Tarea; perfil: Perfil; onHecho: () => void }) {
   const { t } = useT();
   const nombre = useNombres();
   // Paso que pide una nota y espera confirmación.
   const [abierto, setAbierto] = useState<Accion | null>(null);
   const [nota, setNota] = useState("");
+  // Fotos que acompañan la nota: el avance al entregar, o lo que hay que corregir al devolver.
+  const [files, setFiles] = useState<File[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const pasos = pasosDisponibles(tarea, perfil);
@@ -25,9 +28,14 @@ function Pasos({ tarea, perfil }: { tarea: Tarea; perfil: Perfil }) {
     setEnviando(true);
     setError("");
     try {
+      if (files.length) {
+        await subirArchivos(tarea.id, files);
+        setFiles([]);
+      }
       await actuar(tarea.id, accion, texto);
       setAbierto(null);
       setNota("");
+      onHecho();
     } catch (e) {
       setError(t.fallos[falloDe(e)]);
     } finally {
@@ -38,6 +46,7 @@ function Pasos({ tarea, perfil }: { tarea: Tarea; perfil: Perfil }) {
   const elegir = (accion: Accion) => {
     setError("");
     setNota("");
+    setFiles([]);
     if (REGLAS[accion].nota === "no") void dar(accion);
     else setAbierto(accion);
   };
@@ -81,11 +90,15 @@ function Pasos({ tarea, perfil }: { tarea: Tarea; perfil: Perfil }) {
             required={obligatoria}
             autoFocus
           />
-          <div className="mt-3 flex flex-wrap gap-2">
+          <p className="etiqueta mt-4">{perfil.rol === "admin" ? t.archivos.agregar : t.archivos.conNota}</p>
+          <Elegir onElegir={(nuevos) => setFiles((prev) => [...prev, ...nuevos])} ocupado={enviando} />
+          <Elegidos files={files} onQuitar={(i) => setFiles((prev) => prev.filter((_, n) => n !== i))} />
+          {files.length > 0 && <p className="mt-2 text-xs text-gris">{t.archivos.elegidos(files.length)}</p>}
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button className="btn" disabled={enviando}>
-              {t.detalle.confirmar}
+              {enviando && files.length ? t.archivos.subiendo : t.detalle.confirmar}
             </button>
-            <button type="button" className="btn btn-suave" onClick={() => setAbierto(null)}>
+            <button type="button" className="btn btn-suave" disabled={enviando} onClick={() => setAbierto(null)}>
               {t.comun.cancelar}
             </button>
           </div>
@@ -93,11 +106,11 @@ function Pasos({ tarea, perfil }: { tarea: Tarea; perfil: Perfil }) {
       ) : (
         <>
           <p className="mt-2 text-sm text-gris">{t.acciones[pasos[0]].ayuda}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {pasos.map((accion, i) => (
               <button
                 key={accion}
-                className={`btn ${i > 0 ? "btn-linea" : ""}`}
+                className={`btn ${i > 0 ? "btn-linea" : "min-h-14 text-base sm:min-h-0 sm:text-sm"}`}
                 disabled={enviando}
                 onClick={() => elegir(accion)}
               >
@@ -189,13 +202,18 @@ function Linea({ eventos }: { eventos: Evento[] }) {
 
 export default function TareaPage() {
   const { id } = useParams<{ id: string }>();
+  // Se llega con ?aviso=archivo cuando la tarea se creó pero alguno de sus archivos no subió.
+  const sinArchivos = useSearchParams().get("aviso") === "archivo";
   const { perfil, tareas, eventos } = useStore();
   const { t, diaLargo, momento } = useT();
   const nombre = useNombres();
+  const obra = useObras();
   const router = useRouter();
   const [editando, setEditando] = useState(false);
   const [porBorrar, setPorBorrar] = useState(false);
   const [error, setError] = useState("");
+  // Confirma en palabras el paso que se acaba de dar.
+  const [hecho, setHecho] = useState(false);
 
   const tarea = tareas.find((x) => x.id === id);
   if (!perfil) return null;
@@ -221,7 +239,8 @@ export default function TareaPage() {
     }
   };
 
-  const ficha: [string, React.ReactNode][] = [
+  const filas: [string, React.ReactNode][] = [
+    [t.campos.obra, obra(tarea.obraId)],
     [t.campos.estado, <Sello key="e" estado={tarea.estado} />],
     [t.campos.prioridad, <Barras key="p" prioridad={tarea.prioridad} conTexto />],
     [t.campos.vence, <Vence key="v" tarea={tarea} className="!text-sm" />],
@@ -229,11 +248,24 @@ export default function TareaPage() {
     [t.campos.creada, diaLargo(tarea.creada)],
     [t.campos.actualizada, momento(tarea.actualizada)],
   ];
+  const ficha = (
+    <dl className="hoja divide-y divide-regla px-4">
+      {filas.map(([etiqueta, valor]) => (
+        <div key={etiqueta} className="flex items-center justify-between gap-4 py-3">
+          <dt className="rotulo">{etiqueta}</dt>
+          <dd className="text-right text-sm">{valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 
   return (
     <div>
-      <Link href="/panel/tareas" className="rotulo hover:text-tinta">
-        ← {t.detalle.volver}
+      <Link
+        href={tarea.obraId ? `/panel/tareas?obra=${tarea.obraId}` : "/panel/tareas"}
+        className="rotulo inline-block py-1 hover:text-tinta"
+      >
+        ← {tarea.obraId ? obra(tarea.obraId) : t.detalle.volver}
       </Link>
 
       {editando ? (
@@ -242,31 +274,32 @@ export default function TareaPage() {
         </div>
       ) : (
         <>
-          <header className="mt-5 border-b border-tinta pb-6">
+          <header className="mt-4 border-b border-tinta pb-6">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <span className="font-mono text-sm text-gris">{codigoTarea(tarea.numero)}</span>
               <Sello estado={tarea.estado} />
+              <Vence tarea={tarea} />
             </div>
             <h1 className="mt-3 font-display text-3xl font-extrabold leading-[1.05] tracking-tight sm:text-[2.6rem]">
               {tarea.titulo}
             </h1>
             {admin && (
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                <button className="enlace" onClick={() => setEditando(true)}>
+                <button className="enlace py-1" onClick={() => setEditando(true)}>
                   {t.detalle.editar}
                 </button>
                 {porBorrar ? (
                   <span>
                     {t.detalle.eliminarSeguro}
-                    <button className="enlace ml-3 font-semibold text-alerta" onClick={() => void borrar()}>
+                    <button className="enlace ml-3 py-1 font-semibold text-alerta" onClick={() => void borrar()}>
                       {t.detalle.eliminarSi}
                     </button>
-                    <button className="enlace ml-3" onClick={() => setPorBorrar(false)}>
+                    <button className="enlace ml-3 py-1" onClick={() => setPorBorrar(false)}>
                       {t.comun.no}
                     </button>
                   </span>
                 ) : (
-                  <button className="enlace text-gris hover:text-tinta" onClick={() => setPorBorrar(true)}>
+                  <button className="enlace py-1 text-gris hover:text-tinta" onClick={() => setPorBorrar(true)}>
                     {t.detalle.eliminar}
                   </button>
                 )}
@@ -275,15 +308,31 @@ export default function TareaPage() {
             )}
           </header>
 
-          <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_17rem]">
             <div className="min-w-0 space-y-9">
-              <Pasos key={`${tarea.estado}-${perfil.id}`} tarea={tarea} perfil={perfil} />
+              {sinArchivos && (
+                <p role="alert" className="hoja border-alerta px-4 py-3 text-sm font-medium text-alerta">
+                  {t.fallos.archivo}
+                </p>
+              )}
+              {hecho && (
+                <p role="status" className="flex items-center gap-3 font-medium">
+                  <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center bg-marca text-[#16130e]">
+                    ✓
+                  </span>
+                  {t.detalle.hecho(t.estados[tarea.estado])}
+                </p>
+              )}
+              <Pasos key={`${tarea.estado}-${perfil.id}`} tarea={tarea} perfil={perfil} onHecho={() => setHecho(true)} />
               <section>
                 <h2 className="rotulo mb-2">{t.campos.descripcion}</h2>
                 <p className="max-w-2xl whitespace-pre-wrap text-[17px] leading-relaxed">
                   {tarea.descripcion || <span className="text-gris">{t.detalle.sinDescripcion}</span>}
                 </p>
               </section>
+              <Galeria tarea={tarea} />
+              {/* En el celular la ficha va después de lo que hay que hacer y ver. */}
+              <div className="lg:hidden">{ficha}</div>
               <section>
                 <h2 className="mb-3 font-display text-xl font-bold tracking-tight">{t.detalle.historial}</h2>
                 <div className="mb-4">
@@ -293,15 +342,8 @@ export default function TareaPage() {
               </section>
             </div>
 
-            <aside className="order-first lg:order-none">
-              <dl className="hoja divide-y divide-regla px-4 lg:sticky lg:top-8">
-                {ficha.map(([etiqueta, valor]) => (
-                  <div key={etiqueta} className="flex items-center justify-between gap-4 py-3">
-                    <dt className="rotulo">{etiqueta}</dt>
-                    <dd className="text-right text-sm">{valor}</dd>
-                  </div>
-                ))}
-              </dl>
+            <aside className="hidden lg:block">
+              <div className="sticky top-8">{ficha}</div>
             </aside>
           </div>
         </>
