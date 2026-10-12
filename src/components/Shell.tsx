@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ESPERA_ADMIN, abierta } from "@/lib/flujo";
 import { personasDemo, recargar, salir, salirDemo, useStore, verComo } from "@/lib/store";
 import { useT } from "@/lib/textos";
+import { VistaCliente } from "./Cliente";
 import { Ajustes, Cargando, Logo } from "./ui";
 
 /** Franja del modo de muestra: avisa que nada se guarda y deja cambiar de persona. */
@@ -114,6 +115,45 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const activa = (href: string) => (href === "/panel" ? pathname === href : pathname.startsWith(href));
   const enResto = resto.some((s) => activa(s.href));
   const cerrar = () => (demo ? salirDemo() : void salir());
+  const aviso = error && (
+    <p className="hoja mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+      {t.comun.errorCarga}
+      <button type="button" className="enlace" onClick={() => void recargar()}>
+        {t.comun.reintentar}
+      </button>
+    </p>
+  );
+
+  // El cliente tiene una sola pantalla, sin menú: el avance de su obra. Las páginas
+  // del equipo se montan ocultas y vacías, porque a él no le llega ningún dato de ellas.
+  if (perfil.rol === "cliente") {
+    return (
+      <div className="flex min-h-screen flex-1 flex-col">
+        {demo && <BarraDemo />}
+        <header className="border-b border-regla">
+          <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
+            <Logo />
+            <Ajustes />
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-12 pt-7 sm:pt-10">
+          <div className="animate-entrar">
+            {aviso}
+            <VistaCliente />
+          </div>
+          <p className="mt-12 flex items-center justify-between gap-4 border-t border-regla pt-5 text-sm text-gris">
+            <span className="min-w-0 truncate">
+              {perfil.nombre} · {t.roles.cliente}
+            </span>
+            <button type="button" className="enlace shrink-0 py-1" onClick={cerrar}>
+              {demo ? t.demo.salir : t.comun.salir}
+            </button>
+          </p>
+        </main>
+        <div className="hidden">{children}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-1 flex-col">
@@ -165,14 +205,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
         <main className="min-w-0 flex-1 px-5 pb-28 pt-7 lg:px-12 lg:py-11">
           <div className="mx-auto max-w-5xl animate-entrar" key={pathname}>
-            {error && (
-              <p className="hoja mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                {t.comun.errorCarga}
-                <button type="button" className="enlace" onClick={() => void recargar()}>
-                  {t.comun.reintentar}
-                </button>
-              </p>
-            )}
+            {aviso}
             {children}
           </div>
         </main>

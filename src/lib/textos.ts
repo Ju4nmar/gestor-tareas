@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { Accion, Estado, Fallo, Prioridad, Rol, Suceso } from "./types";
+import type { Accion, Estado, Etapa, Fallo, Prioridad, Rol, Suceso } from "./types";
 
 // Todos los textos de la aplicación, en español e inglés. El idioma se elige con
 // el botón del menú y se recuerda en el navegador.
@@ -9,7 +9,9 @@ import type { Accion, Estado, Fallo, Prioridad, Rol, Suceso } from "./types";
 const es = {
   marca: "Relevo",
   lema: "Quién hace qué, y para cuándo.",
-  roles: { admin: "Administrador", empleado: "Empleado" } as Record<Rol, string>,
+  roles: { admin: "Administrador", empleado: "Empleado", cliente: "Cliente" } as Record<Rol, string>,
+  /** Cómo va una tarea a ojos del cliente. */
+  etapas: { pendiente: "Pendiente", en_proceso: "En proceso", terminada: "Terminada" } as Record<Etapa, string>,
   estados: {
     borrador: "Sin asignar",
     asignada: "Asignada",
@@ -149,6 +151,7 @@ const es = {
     demo: "Probar sin cuenta",
     demoAdmin: "Entrar como administradora",
     demoEmpleado: "Entrar como empleado",
+    demoCliente: "Entrar como cliente de una obra",
     demoNota: "Datos de ejemplo. Nada se guarda.",
     sinAcceso: (correo: string) =>
       `La cuenta ${correo} todavía no tiene acceso. Pide a tu administrador el enlace de invitación.`,
@@ -275,6 +278,17 @@ const es = {
     archivadas: "Obras archivadas",
     elegir: "Elige la obra",
     avanceCorto: "Avance total",
+    clientes: "Cliente",
+    sinCliente: "Nadie invitado a seguir esta obra.",
+    invitarCliente: "Invitar al cliente",
+    clienteOpcional: "Cliente de la obra (opcional)",
+    clienteAyuda:
+      "El cliente entra con su propia cuenta y ve el avance, las tareas (pendiente, en proceso o terminada) y las fotos de esta obra. No ve comentarios ni instrucciones, y no puede cambiar nada.",
+    clienteNombre: "Nombre del cliente",
+    clienteCorreo: "Correo del cliente",
+    quitarCliente: "Quitar",
+    quitarClienteSeguro: "¿Quitarle el acceso a esta obra?",
+    enlaceListo: "Invitación creada. Copia el enlace y envíaselo por WhatsApp o correo: sirve una sola vez.",
   },
   historial: {
     titulo: "Historial",
@@ -321,6 +335,23 @@ const es = {
     tu: "tú",
     abiertas: (n: number) => (n === 1 ? "1 tarea abierta" : `${n} tareas abiertas`),
     guardar: "Guardar",
+    clientes: "Clientes",
+    clientesAyuda: "Se invitan desde cada obra, en la página de Obras.",
+    sigue: (obras: string) => `Sigue: ${obras}`,
+    sinObra: "sin obra",
+  },
+  cliente: {
+    tusObras: "Tus obras",
+    avance: (hechas: number, total: number) => `${hechas} de ${total} tareas terminadas`,
+    fotos: "Fotos del avance",
+    sinFotos: "Todavía no hay fotos. Aparecerán aquí a medida que avance la obra.",
+    tareas: "Tareas",
+    sinTareas: "Aún no hay tareas programadas en esta obra.",
+    para: (fecha: string) => `Para el ${fecha}`,
+    terminadaEl: (fecha: string) => `Terminada el ${fecha}`,
+    sinObras: "Todavía no tienes una obra asignada. Escríbele a quien te invitó.",
+    privado: "Solo tú y el equipo de la obra pueden ver esta página.",
+    terminadaObra: "Obra terminada",
   },
   fallos: {
     permiso: "No tienes permiso para hacer eso.",
@@ -357,7 +388,8 @@ const es = {
 const en: typeof es = {
   marca: "Relevo",
   lema: "Who does what, and by when.",
-  roles: { admin: "Admin", empleado: "Team member" },
+  roles: { admin: "Admin", empleado: "Team member", cliente: "Client" },
+  etapas: { pendiente: "Pending", en_proceso: "In progress", terminada: "Done" },
   estados: {
     borrador: "Unassigned",
     asignada: "Assigned",
@@ -487,6 +519,7 @@ const en: typeof es = {
     demo: "Try it without an account",
     demoAdmin: "Enter as the admin",
     demoEmpleado: "Enter as a team member",
+    demoCliente: "Enter as a project client",
     demoNota: "Sample data. Nothing is saved.",
     sinAcceso: (correo) => `The account ${correo} has no access yet. Ask your admin for the invitation link.`,
     desactivada: "Your account is deactivated. Talk to your admin.",
@@ -608,6 +641,17 @@ const en: typeof es = {
     archivadas: "Archived projects",
     elegir: "Choose the project",
     avanceCorto: "Overall progress",
+    clientes: "Client",
+    sinCliente: "Nobody is invited to follow this project.",
+    invitarCliente: "Invite the client",
+    clienteOpcional: "Project client (optional)",
+    clienteAyuda:
+      "The client signs in with their own account and sees the progress, the tasks (pending, in progress or done) and the photos of this project. They see no comments or instructions, and cannot change anything.",
+    clienteNombre: "Client name",
+    clienteCorreo: "Client email",
+    quitarCliente: "Remove",
+    quitarClienteSeguro: "Remove their access to this project?",
+    enlaceListo: "Invitation created. Copy the link and send it by WhatsApp or email: it works only once.",
   },
   historial: {
     titulo: "History",
@@ -654,6 +698,23 @@ const en: typeof es = {
     tu: "you",
     abiertas: (n) => (n === 1 ? "1 open task" : `${n} open tasks`),
     guardar: "Save",
+    clientes: "Clients",
+    clientesAyuda: "They are invited from each project, on the Projects page.",
+    sigue: (obras) => `Follows: ${obras}`,
+    sinObra: "no project",
+  },
+  cliente: {
+    tusObras: "Your projects",
+    avance: (hechas, total) => `${hechas} of ${total} tasks done`,
+    fotos: "Progress photos",
+    sinFotos: "No photos yet. They will show up here as the work moves forward.",
+    tareas: "Tasks",
+    sinTareas: "No tasks scheduled in this project yet.",
+    para: (fecha) => `Due ${fecha}`,
+    terminadaEl: (fecha) => `Done on ${fecha}`,
+    sinObras: "You have no project assigned yet. Contact whoever invited you.",
+    privado: "Only you and the project team can see this page.",
+    terminadaObra: "Project finished",
   },
   fallos: {
     permiso: "You are not allowed to do that.",

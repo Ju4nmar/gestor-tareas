@@ -173,11 +173,13 @@ function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; ob
               <option value="">
                 {t.campos.responsable}: {t.comun.todos.toLowerCase()}
               </option>
-              {perfiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
+              {perfiles
+                .filter((p) => p.rol !== "cliente")
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
               <option value="nadie">{t.comun.sinResponsable}</option>
             </select>
           )}

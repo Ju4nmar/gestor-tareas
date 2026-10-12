@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Encabezado, Seccion, falloDe } from "@/components/ui";
+import { Encabezado, Seccion, copiarInvitacion, falloDe } from "@/components/ui";
 import { abierta } from "@/lib/flujo";
 import { actualizarPerfil, invitar, quitarInvitacion, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Perfil, Rol } from "@/lib/types";
 
-const enlaceDe = (codigo: string) => `${window.location.origin}/activar?codigo=${codigo}`;
-
 export default function EquipoPage() {
-  const { perfil, perfiles, tareas } = useStore();
+  const { perfil, perfiles: todos, tareas, obras, clientes: enlaces } = useStore();
   const { t } = useT();
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -42,14 +40,18 @@ export default function EquipoPage() {
   };
 
   const copiar = async (codigo: string) => {
-    try {
-      await navigator.clipboard.writeText(enlaceDe(codigo));
-      setCopiado(codigo);
-    } catch {
-      // Sin permiso para el portapapeles: se muestra el enlace para copiarlo a mano.
-      window.prompt(t.equipo.enlace, enlaceDe(codigo));
-    }
+    if (await copiarInvitacion(codigo, t.equipo.enlace)) setCopiado(codigo);
   };
+
+  // Los clientes se invitan desde cada obra y no cambian de rol: van en su propia lista.
+  const perfiles = todos.filter((p) => p.rol !== "cliente");
+  const clientes = todos.filter((p) => p.rol === "cliente");
+  const obrasDe = (id: string) =>
+    enlaces
+      .filter((c) => c.perfilId === id)
+      .map((c) => obras.find((o) => o.id === c.obraId)?.nombre)
+      .filter(Boolean)
+      .join(", ");
 
   const cambiar = (p: Perfil, patch: Partial<Pick<Perfil, "nombre" | "rol" | "activo">>) =>
     intentar(() => actualizarPerfil(p.id, patch.nombre ?? p.nombre, patch.rol ?? p.rol, patch.activo ?? p.activo));
@@ -156,6 +158,39 @@ export default function EquipoPage() {
           );
         })}
       </ul>
+
+      {clientes.length > 0 && (
+        <Seccion titulo={t.equipo.clientes} cuenta={clientes.length}>
+          <p className="mb-3 max-w-2xl text-sm text-gris">{t.equipo.clientesAyuda}</p>
+          <ul className="border-t border-tinta">
+            {clientes.map((p) => (
+              <li
+                key={p.id}
+                className={`grid grid-cols-1 gap-x-6 gap-y-2 border-b border-regla py-4 lg:grid-cols-[1fr_auto] lg:items-center ${p.activo ? "" : "opacity-55"}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold">{p.nombre}</p>
+                  <p className="mt-0.5 truncate font-mono text-xs text-gris">
+                    {p.email} · {!p.userId ? t.comun.pendiente : p.activo ? t.equipo.sigue(obrasDe(p.id) || t.equipo.sinObra) : t.comun.inactivo}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm lg:justify-end">
+                  {!p.userId && p.codigo && (
+                    <button className="enlace font-medium" onClick={() => void copiar(p.codigo!)}>
+                      {copiado === p.codigo ? t.equipo.copiado : t.equipo.enlace}
+                    </button>
+                  )}
+                  {p.userId && (
+                    <button className="enlace text-gris hover:text-tinta" onClick={() => void cambiar(p, { activo: !p.activo })}>
+                      {p.activo ? t.equipo.desactivar : t.equipo.reactivar}
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Seccion>
+      )}
     </div>
   );
 }

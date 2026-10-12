@@ -7,7 +7,20 @@ import { fechaLocal } from "./fechas";
 import { ErrorFlujo } from "./flujo";
 import { supabase } from "./supabase";
 import { idiomaActual } from "./textos";
-import type { Accion, Archivo, DatosTarea, Evento, Fallo, Obra, Perfil, Rol, Tarea } from "./types";
+import type {
+  Accion,
+  Archivo,
+  ClienteObra,
+  DatosTarea,
+  Etapa,
+  Evento,
+  Fallo,
+  Obra,
+  ObraCliente,
+  Perfil,
+  Rol,
+  Tarea,
+} from "./types";
 
 // Estado compartido. Con sesión, los datos vienen de Supabase y cada cambio pasa
 // por una función de la base de datos; en el modo de muestra todo ocurre en la
@@ -30,6 +43,10 @@ export type State = {
   perfiles: Perfil[];
   obras: Obra[];
   archivos: Archivo[];
+  /** Clientes invitados a cada obra; solo lo recibe el administrador. */
+  clientes: ClienteObra[];
+  /** Lo que ve quien entra como cliente: sus obras con tareas resumidas y fotos. */
+  seguimiento: ObraCliente[];
 };
 
 const initial: State = {
@@ -45,6 +62,8 @@ const initial: State = {
   perfiles: [],
   obras: [],
   archivos: [],
+  clientes: [],
+  seguimiento: [],
 };
 
 let state = initial;
@@ -83,7 +102,9 @@ let base: demo.Base | null = null;
 function leerDemo(): demo.Base | null {
   try {
     const guardado = window.sessionStorage.getItem(CLAVE_DEMO);
-    return guardado ? (JSON.parse(guardado) as demo.Base) : null;
+    const b = guardado ? (JSON.parse(guardado) as demo.Base) : null;
+    // Una muestra guardada antes de que hubiera clientes: se empieza de nuevo.
+    return b && Array.isArray(b.clientes) ? b : null;
   } catch {
     return null;
   }
@@ -99,6 +120,7 @@ function ponerDemo(b: demo.Base) {
   }
   const yo = b.perfiles.find((p) => p.id === b.yo) ?? null;
   const admin = yo?.rol === "admin";
+  // El cliente no recibe tareas ni historial: solo el resumen de sus obras.
   const tareas = admin ? b.tareas : b.tareas.filter((t) => t.asignadaA === b.yo);
   const visibles = new Set(tareas.map((t) => t.id));
   set({
@@ -114,12 +136,14 @@ function ponerDemo(b: demo.Base) {
     perfiles: admin ? b.perfiles : b.perfiles.filter((p) => p.id === b.yo),
     obras: admin ? b.obras : b.obras.filter((o) => tareas.some((t) => t.obraId === o.id)),
     archivos: b.archivos.filter((a) => visibles.has(a.tareaId)),
+    clientes: admin ? b.clientes : [],
+    seguimiento: yo?.rol === "cliente" ? demo.vistaCliente(b) : [],
   });
 }
 
 export function entrarDemo(rol: Rol) {
   const b = semillaDemo();
-  b.yo = rol === "admin" ? "admin" : "p1";
+  b.yo = rol === "admin" ? "admin" : rol === "cliente" ? "c1" : "p1";
   ponerDemo(b);
 }
 
@@ -251,17 +275,52 @@ const aArchivo = (f: FilaArchivo): Archivo => ({
   fecha: f.created_at,
 });
 
+type FilaSeguimiento = FilaObra & {
+  tasks: { id: string; number: number; title: string; stage: Etapa; due_date: string | null; completed_at: string | null }[];
+  files: { id: string; task_id: string; path: string; name: string; mime: string; created_at: string }[];
+};
+
+const aSeguimiento = (f: FilaSeguimiento): ObraCliente => ({
+  ...aObra(f),
+  tareas: f.tasks.map((t) => ({
+    id: t.id,
+    numero: t.number,
+    titulo: t.title,
+    etapa: t.stage,
+    vence: t.due_date,
+    completada: t.completed_at,
+  })),
+  archivos: f.files.map((a) => ({
+    id: a.id,
+    tareaId: a.task_id,
+    ruta: a.path,
+    nombre: a.name,
+    tipo: a.mime,
+    peso: 0,
+    subidoPor: null,
+    autor: "",
+    fecha: a.created_at,
+  })),
+});
+
 /** Trae tareas, historial, equipo, obras y archivos. La base de datos entrega solo lo que esa persona puede ver. */
 export async function recargar() {
   if (state.demo || !state.perfil) return;
-  const [tareas, eventos, perfiles, obras, archivos] = await Promise.all([
+  if (state.perfil.rol === "cliente") {
+    // El cliente no lee las tablas: una función le arma el resumen de sus obras.
+    const { data, error } = await supabase.rpc("tm_client_view");
+    if (error) return set({ cargado: true, error: true });
+    return set({ cargado: true, error: false, seguimiento: ((data ?? []) as FilaSeguimiento[]).map(aSeguimiento) });
+  }
+  const [tareas, eventos, perfiles, obras, archivos, clientes] = await Promise.all([
     supabase.from("tm_tasks").select("*").order("number", { ascending: false }),
     supabase.from("tm_events").select("*").order("id", { ascending: false }).limit(3000),
     supabase.from("tm_profiles").select("*").order("name"),
     supabase.from("tm_projects").select("*").order("created_at"),
     supabase.from("tm_files").select("*").order("created_at", { ascending: false }),
+    supabase.from("tm_project_clients").select("project_id, profile_id"),
   ]);
-  if (tareas.error || eventos.error || perfiles.error || obras.error || archivos.error) {
+  if (tareas.error || eventos.error || perfiles.error || obras.error || archivos.error || clientes.error) {
     return set({ cargado: true, error: true });
   }
   set({
@@ -272,6 +331,10 @@ export async function recargar() {
     perfiles: (perfiles.data as FilaPerfil[]).map(aPerfil),
     obras: (obras.data as FilaObra[]).map(aObra),
     archivos: (archivos.data as FilaArchivo[]).map(aArchivo),
+    clientes: (clientes.data as { project_id: string; profile_id: string }[]).map((c) => ({
+      obraId: c.project_id,
+      perfilId: c.profile_id,
+    })),
   });
 }
 
@@ -409,6 +472,25 @@ export const borrarObra = (id: string) =>
   cambiar(
     () => rpc<void>("tm_delete_project", { p_id: id }),
     (b) => demo.borrarObra(b, id),
+  );
+
+/**
+ * Invita a un cliente a seguir una obra. Devuelve su código de invitación, o vacío
+ * si esa persona ya tenía cuenta de cliente (queda unida a la obra sin más pasos).
+ */
+export const invitarCliente = (obraId: string, nombre: string, email: string) =>
+  cambiar(
+    () =>
+      rpc<FilaPerfil>("tm_invite_client", { p_project: obraId, p_name: nombre, p_email: email }).then(
+        (fila) => fila.invite_code ?? "",
+      ),
+    (b) => demo.invitarCliente(b, obraId, nombre, email),
+  );
+
+export const quitarCliente = (obraId: string, perfilId: string) =>
+  cambiar(
+    () => rpc<void>("tm_remove_client", { p_project: obraId, p_profile: perfilId }),
+    (b) => demo.quitarCliente(b, obraId, perfilId),
   );
 
 // --- Fotos y archivos -------------------------------------------------------

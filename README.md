@@ -9,6 +9,7 @@ o devuelve. Todo queda en el historial. Está pensada para usarse desde el celul
 
 **Administrador**
 - Crea las obras y las archiva cuando terminan; ve el avance de cada una.
+- Invita al cliente de cada obra, al crearla o después, con un enlace de un solo uso.
 - Crea tareas con obra, título, descripción, prioridad, fecha límite y responsable; las edita, reasigna o elimina.
 - Adjunta planos o fotos (imágenes o PDF) para explicar la tarea.
 - Ve todas las tareas agrupadas por obra, con filtros (obra, estado, prioridad, responsable, vencidas) y el flujo completo en su tablero.
@@ -21,6 +22,11 @@ o devuelve. Todo queda en el historial. Está pensada para usarse desde el celul
 - Acepta, pide aclaración (con motivo), empieza, envía con nota de entrega y comenta.
 - Toma una foto con el celular o sube una de la galería para mostrar el avance, al entregar o en cualquier momento.
 - Consulta sus tareas completadas y su historial.
+
+**Cliente de una obra**
+- Ve solo su obra (o sus obras): el porcentaje de avance, las fotos y las tareas en tres etapas
+  —pendiente, en proceso, terminada—, con sus fechas.
+- No ve instrucciones, comentarios, historial ni quién hace cada tarea, y no puede cambiar nada.
 
 ## Flujo de estados
 
@@ -43,6 +49,8 @@ Las reglas están en `src/lib/flujo.ts` y, las que mandan, en la función `tm_ac
   manipule la aplicación, no puede aprobar su propia tarea ni saltarse un estado.
 - **Usuarios por invitación.** El administrador crea la invitación y comparte un enlace de un solo uso;
   la persona elige su contraseña. El administrador nunca la conoce.
+- **El cliente no lee las tablas.** Una función de la base le arma el resumen de su obra campo por
+  campo, así que lo interno no viaja a su navegador aunque abra las herramientas del desarrollador.
 - **Fotos y archivos privados.** Se guardan en un almacén privado de Supabase: solo los abre el
   administrador o la persona responsable de esa tarea, con enlaces que caducan en una hora. Las fotos
   se reducen en el teléfono antes de subir, para que carguen rápido con mala señal.
@@ -68,13 +76,13 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
 En la página de entrada, «Probar sin cuenta» abre una muestra con un equipo ficticio (también con
-`/?demo=admin` o `/?demo=empleado`). La muestra vive en la pestaña y no toca la base de datos.
+`/?demo=admin`, `/?demo=empleado` o `/?demo=cliente`). La muestra vive en la pestaña y no toca la base de datos.
 
 ## Instalarla para un cliente
 
 1. Crea un proyecto en Supabase y ejecuta `supabase/schema.sql` completo en el SQL Editor.
-   Si la base ya tenía una versión anterior (sin obras ni archivos), basta con ejecutar
-   `supabase/migrations/001_obras_y_archivos.sql`.
+   Si la base ya tenía una versión anterior, basta con ejecutar en orden las migraciones que
+   falten de `supabase/migrations/` (001 obras y archivos, 002 clientes).
 2. En Supabase → Authentication → Users, crea el usuario del administrador (correo y contraseña).
 3. En Authentication → URL Configuration, pon la dirección definitiva del sitio como *Site URL*.
    Los enlaces de confirmación de correo y de cambio de contraseña llevan a esa dirección.

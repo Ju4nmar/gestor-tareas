@@ -22,10 +22,10 @@ export default function EntradaPage() {
     if (listo && perfil) router.replace("/panel");
   }, [listo, perfil, router]);
 
-  // Un enlace con ?demo=admin o ?demo=empleado abre la muestra sin pasar por esta página.
+  // Un enlace con ?demo=admin, ?demo=empleado o ?demo=cliente abre la muestra sin pasar por esta página.
   const muestra = useSearchParams().get("demo");
   useEffect(() => {
-    if (muestra === "admin" || muestra === "empleado") entrarDemo(muestra);
+    if (muestra === "admin" || muestra === "empleado" || muestra === "cliente") entrarDemo(muestra);
   }, [muestra]);
 
   const enviar = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -145,6 +145,9 @@ export default function EntradaPage() {
                   </button>
                   <button type="button" className="btn btn-linea" onClick={() => demo("empleado")}>
                     {t.entrada.demoEmpleado}
+                  </button>
+                  <button type="button" className="btn btn-linea sm:col-span-2" onClick={() => demo("cliente")}>
+                    {t.entrada.demoCliente}
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-gris">{t.entrada.demoNota}</p>

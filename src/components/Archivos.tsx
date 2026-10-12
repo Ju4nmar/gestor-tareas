@@ -6,7 +6,7 @@ import { useT } from "@/lib/textos";
 import type { Archivo, Tarea } from "@/lib/types";
 import { falloDe } from "./ui";
 
-const esFoto = (a: Pick<Archivo, "tipo">) => a.tipo.startsWith("image/");
+export const esFoto = (a: Pick<Archivo, "tipo">) => a.tipo.startsWith("image/");
 
 function Camara() {
   return (
@@ -73,7 +73,7 @@ export function Elegidos({ files, onQuitar }: { files: File[]; onQuitar: (i: num
 }
 
 /** Direcciones para ver los archivos; se piden al almacén cuando cambia la lista. */
-function useUrls(archivos: Archivo[]) {
+export function useUrls(archivos: Archivo[]) {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const clave = archivos.map((a) => a.id).join(",");
   useEffect(() => {
@@ -88,6 +88,25 @@ function useUrls(archivos: Archivo[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave]);
   return urls;
+}
+
+/** Una foto a pantalla completa; se cierra tocando en cualquier parte. */
+export function Visor({ url, nombre, pie, onCerrar }: { url: string; nombre: string; pie: string; onCerrar: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/90 p-4" role="dialog" aria-modal aria-label={nombre} onClick={onCerrar}>
+      <div className="flex items-center justify-between gap-4 pb-3 text-white">
+        <p className="truncate text-sm">{pie}</p>
+        <button type="button" className="btn shrink-0 border-white bg-white text-black">
+          {t.archivos.cerrar}
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element -- foto del almacén privado, con enlace temporal */}
+        <img src={url} alt={nombre} className="max-h-full max-w-full object-contain" />
+      </div>
+    </div>
+  );
 }
 
 /** Fotos y archivos de una tarea: verlos en grande, subir más y quitar los propios. */
@@ -198,26 +217,12 @@ export function Galeria({ tarea }: { tarea: Tarea }) {
       )}
 
       {grande && urls[grande.id] && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/90 p-4"
-          role="dialog"
-          aria-modal
-          aria-label={grande.nombre}
-          onClick={() => setAbierta(null)}
-        >
-          <div className="flex items-center justify-between gap-4 pb-3 text-white">
-            <p className="truncate text-sm">
-              {grande.nombre} · {t.archivos.de(grande.autor)}
-            </p>
-            <button type="button" className="btn shrink-0 border-white bg-white text-black">
-              {t.archivos.cerrar}
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- foto del almacén privado */}
-            <img src={urls[grande.id]} alt={grande.nombre} className="max-h-full max-w-full object-contain" />
-          </div>
-        </div>
+        <Visor
+          url={urls[grande.id]}
+          nombre={grande.nombre}
+          pie={`${grande.nombre} · ${t.archivos.de(grande.autor)}`}
+          onCerrar={() => setAbierta(null)}
+        />
       )}
     </section>
   );

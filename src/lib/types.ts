@@ -1,4 +1,5 @@
-export type Rol = "admin" | "empleado";
+/** El cliente solo mira el avance de su obra: no recibe tareas ni cambia nada. */
+export type Rol = "admin" | "empleado" | "cliente";
 
 /** Estados de una tarea, en el orden del flujo. */
 export type Estado =
@@ -100,6 +101,25 @@ export type Evento = {
   a: Estado | null;
   nota: string;
 };
+
+/** Cómo va una tarea a ojos del cliente, sin los pasos internos del equipo. */
+export type Etapa = "pendiente" | "en_proceso" | "terminada";
+
+/** Lo que un cliente ve de una tarea. */
+export type TareaCliente = {
+  id: string;
+  numero: number;
+  titulo: string;
+  etapa: Etapa;
+  vence: string | null;
+  completada: string | null;
+};
+
+/** Una obra tal como la ve su cliente: tareas resumidas y fotos. */
+export type ObraCliente = Obra & { tareas: TareaCliente[]; archivos: Archivo[] };
+
+/** Un cliente invitado a seguir una obra. */
+export type ClienteObra = { obraId: string; perfilId: string };
 
 /** Campos que el administrador llena al crear o editar una tarea. */
 export type DatosTarea = Pick<Tarea, "titulo" | "descripcion" | "prioridad" | "vence" | "asignadaA" | "obraId">;

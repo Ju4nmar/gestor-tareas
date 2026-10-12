@@ -64,6 +64,7 @@ export default function InformesPage() {
     if (responsable) devueltasDe.set(responsable, (devueltasDe.get(responsable) ?? 0) + 1);
   }
   const personas = perfiles
+    .filter((p) => p.rol !== "cliente")
     .map((p) => {
       const suyas = tareas.filter((x) => x.asignadaA === p.id);
       const hechas = suyas.filter((x) => enPeriodo(x.completada));

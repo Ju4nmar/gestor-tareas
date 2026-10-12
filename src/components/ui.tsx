@@ -11,6 +11,20 @@ import type { Estado, Evento, Fallo, Prioridad, Tarea } from "@/lib/types";
 /** Clave del motivo de un error, para buscar su texto en `t.fallos`. */
 export const falloDe = (e: unknown): Fallo => (e instanceof ErrorFlujo ? e.fallo : "error");
 
+/** Enlace de un solo uso con el que una persona invitada crea su contraseña. */
+export const enlaceInvitacion = (codigo: string) => `${window.location.origin}/activar?codigo=${codigo}`;
+
+/** Copia el enlace de invitación; sin permiso para el portapapeles, lo muestra para copiarlo a mano. */
+export async function copiarInvitacion(codigo: string, titulo: string) {
+  try {
+    await navigator.clipboard.writeText(enlaceInvitacion(codigo));
+    return true;
+  } catch {
+    window.prompt(titulo, enlaceInvitacion(codigo));
+    return false;
+  }
+}
+
 /** Nombre de la aplicación, con su punto de resaltador. */
 export function Logo({ className = "text-2xl" }: { className?: string }) {
   const { t } = useT();

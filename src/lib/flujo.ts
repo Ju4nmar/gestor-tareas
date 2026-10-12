@@ -1,4 +1,4 @@
-import type { Accion, Estado, Fallo, Perfil, Prioridad, Tarea } from "./types";
+import type { Accion, Estado, Etapa, Fallo, Perfil, Prioridad, Tarea } from "./types";
 
 // Las reglas del flujo de trabajo. La base de datos aplica estas mismas reglas
 // (función tm_act en supabase/schema.sql): aquí sirven para mostrar solo los
@@ -99,6 +99,16 @@ export const ESPERA_RESPONSABLE: Estado[] = ["asignada", "aceptada", "en_curso",
 export const codigoTarea = (numero: number) => `T-${String(numero).padStart(3, "0")}`;
 
 /** Operación rechazada: lleva la clave del motivo para mostrar el texto en el idioma elegido. */
+/** Estado que ve el cliente: resume el flujo interno en tres etapas. */
+export const etapaDe = (estado: Estado): Etapa =>
+  estado === "completada"
+    ? "terminada"
+    : (["en_curso", "enviada", "en_revision", "devuelta"] as Estado[]).includes(estado)
+      ? "en_proceso"
+      : "pendiente";
+
+export const ETAPAS: Etapa[] = ["en_proceso", "pendiente", "terminada"];
+
 export class ErrorFlujo extends Error {
   constructor(public fallo: Fallo) {
     super(fallo);

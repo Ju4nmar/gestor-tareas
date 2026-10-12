@@ -46,7 +46,7 @@ export default function HistorialPage() {
               {t.historial.persona}: {t.comun.todas.toLowerCase()}
             </option>
             {perfiles
-              .filter((p) => p.userId)
+              .filter((p) => p.userId && p.rol !== "cliente")
               .map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.nombre}

@@ -1,6 +1,19 @@
 import { sumarDias } from "./fechas";
-import { ErrorFlujo, NOTA_MAXIMA, NOTA_MINIMA, REGLAS, puede } from "./flujo";
-import type { Accion, Archivo, DatosTarea, Estado, Evento, Obra, Perfil, Rol, Suceso, Tarea } from "./types";
+import { ErrorFlujo, NOTA_MAXIMA, NOTA_MINIMA, REGLAS, etapaDe, puede } from "./flujo";
+import type {
+  Accion,
+  Archivo,
+  ClienteObra,
+  DatosTarea,
+  Estado,
+  Evento,
+  Obra,
+  ObraCliente,
+  Perfil,
+  Rol,
+  Suceso,
+  Tarea,
+} from "./types";
 
 // El modo de muestra: una empresa de remodelaciones ficticia que vive en la pestaña
 // del visitante. Estas funciones hacen lo mismo que las de la base de datos
@@ -14,6 +27,8 @@ export type Base = {
   tareas: Tarea[];
   eventos: Evento[];
   archivos: Archivo[];
+  /** Qué cliente sigue qué obra. */
+  clientes: ClienteObra[];
   /** Consecutivo para números de tarea e ids. */
   sec: number;
 };
@@ -55,7 +70,10 @@ export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fech
   const titulo = datos.titulo.trim();
   if (titulo.length < 3 || titulo.length > 140) throw new ErrorFlujo("titulo");
   if (datos.descripcion.length > 5000) throw new ErrorFlujo("descripcion");
-  const responsable = datos.asignadaA ? b.perfiles.find((p) => p.id === datos.asignadaA && p.activo) : null;
+  // Un cliente nunca es responsable de una tarea.
+  const responsable = datos.asignadaA
+    ? b.perfiles.find((p) => p.id === datos.asignadaA && p.activo && p.rol !== "cliente")
+    : null;
   if (datos.asignadaA && !responsable) throw new ErrorFlujo("asignado");
   if (datos.obraId && !b.obras.some((o) => o.id === datos.obraId)) throw new ErrorFlujo("obra");
 
@@ -173,6 +191,72 @@ export function borrarObra(b: Base, id: string) {
   administrador(b);
   if (b.tareas.some((t) => t.obraId === id)) throw new ErrorFlujo("con_tareas");
   b.obras = b.obras.filter((o) => o.id !== id);
+  b.clientes = b.clientes.filter((c) => c.obraId !== id);
+}
+
+/**
+ * Invita a un cliente a una obra y devuelve su código de invitación (vacío si ya
+ * tenía cuenta). Si ese correo ya es de un cliente, solo lo une a la obra.
+ */
+export function invitarCliente(b: Base, obraId: string, nombre: string, email: string) {
+  administrador(b);
+  if (!b.obras.some((o) => o.id === obraId)) throw new ErrorFlujo("obra");
+  const correo = email.trim().toLowerCase();
+  if (!/^[^@ ]+@[^@ ]+[.][^@ ]+$/.test(correo)) throw new ErrorFlujo("email");
+  let perfil = b.perfiles.find((p) => p.email === correo);
+  if (perfil && perfil.rol !== "cliente") throw new ErrorFlujo("duplicado");
+  if (!perfil) {
+    if (nombre.trim().length < 2 || nombre.trim().length > 80) throw new ErrorFlujo("nombre");
+    perfil = {
+      id: `c${++b.sec}`,
+      userId: null,
+      email: correo,
+      nombre: nombre.trim(),
+      rol: "cliente",
+      activo: true,
+      codigo: `DEMO${String(b.sec).padStart(6, "0")}`,
+      creado: ahoraIso(),
+    };
+    b.perfiles.push(perfil);
+  }
+  if (!b.clientes.some((c) => c.obraId === obraId && c.perfilId === perfil.id)) {
+    b.clientes.push({ obraId, perfilId: perfil.id });
+  }
+  return perfil.codigo ?? "";
+}
+
+/** Quita a un cliente de una obra; si no le queda ninguna y no activó su cuenta, se va la invitación. */
+export function quitarCliente(b: Base, obraId: string, perfilId: string) {
+  administrador(b);
+  if (!b.clientes.some((c) => c.obraId === obraId && c.perfilId === perfilId)) throw new ErrorFlujo("no_existe");
+  b.clientes = b.clientes.filter((c) => !(c.obraId === obraId && c.perfilId === perfilId));
+  if (!b.clientes.some((c) => c.perfilId === perfilId)) {
+    b.perfiles = b.perfiles.filter((p) => !(p.id === perfilId && p.rol === "cliente" && !p.userId));
+  }
+}
+
+/** Lo que ve un cliente: sus obras con las tareas resumidas y las fotos, sin nada interno. */
+export function vistaCliente(b: Base): ObraCliente[] {
+  return b.obras
+    .filter((o) => b.clientes.some((c) => c.obraId === o.id && c.perfilId === b.yo))
+    .map((o) => {
+      const tareas = b.tareas.filter((t) => t.obraId === o.id).sort((x, y) => x.numero - y.numero);
+      const ids = new Set(tareas.map((t) => t.id));
+      return {
+        ...o,
+        tareas: tareas.map((t) => ({
+          id: t.id,
+          numero: t.numero,
+          titulo: t.titulo,
+          etapa: etapaDe(t.estado),
+          vence: t.vence,
+          completada: t.completada,
+        })),
+        archivos: b.archivos
+          .filter((a) => ids.has(a.tareaId))
+          .map((a) => ({ ...a, peso: 0, subidoPor: null, autor: "" })),
+      };
+    });
 }
 
 export function invitar(b: Base, nombre: string, email: string, rol: Rol) {
@@ -200,6 +284,8 @@ export function actualizarPerfil(b: Base, id: string, nombre: string, rol: Rol, 
   if (nombre.trim().length < 2 || nombre.trim().length > 80) throw new ErrorFlujo("nombre");
   const perfil = b.perfiles.find((p) => p.id === id);
   if (!perfil) throw new ErrorFlujo("no_existe");
+  // El rol de cliente no se cambia desde Equipo, ni nadie del equipo pasa a ser cliente.
+  if ((perfil.rol === "cliente") !== (rol === "cliente")) throw new ErrorFlujo("rol");
   const pierde = rol !== "admin" || !activo;
   if (perfil.id === admin.id && pierde) throw new ErrorFlujo("propio");
   const admins = b.perfiles.filter((p) => p.rol === "admin" && p.activo && p.userId).length;
@@ -216,6 +302,7 @@ export function quitarInvitacion(b: Base, id: string) {
     if (t.asignadaA === id && t.estado !== "completada") Object.assign(t, { asignadaA: null, estado: "borrador" });
   }
   b.perfiles = b.perfiles.filter((p) => p.id !== id);
+  b.clientes = b.clientes.filter((c) => c.perfilId !== id);
 }
 
 // --- Contenido de muestra ---------------------------------------------------
@@ -474,7 +561,7 @@ export function semilla(idioma: "es" | "en", hoy: string): Base {
     nombre,
     rol,
     activo: true,
-    codigo: activa ? null : "DEMOSOFIA1",
+    codigo: activa ? null : `DEMO${id.toUpperCase()}INVITA`,
     creado: `${sumarDias(hoy, -30)}T14:00:00.000Z`,
   });
   const b: Base = {
@@ -485,11 +572,18 @@ export function semilla(idioma: "es" | "en", hoy: string): Base {
       persona("p2", "Daniela Ortiz", "empleado"),
       persona("p3", "Andrés Peña", "empleado"),
       persona("p4", "Sofía Mejía", "empleado", false),
+      persona("c1", "Marcela Gómez", "cliente"),
+      persona("c2", "Jorge Salazar", "cliente", false),
     ],
     obras: OBRAS.map(([nombre, detalle], n) => ({ id: `o${n + 1}`, nombre: nombre[i], detalle: detalle[i], activa: true })),
     tareas: [],
     eventos: [],
     archivos: [],
+    // Marcela sigue el local; Jorge fue invitado al apartamento y aún no activa su cuenta.
+    clientes: [
+      { obraId: "o1", perfilId: "c1" },
+      { obraId: "o2", perfilId: "c2" },
+    ],
     sec: 0,
   };
   // La hora avanza con cada paso para que el historial quede en orden.

@@ -45,7 +45,7 @@ export function TareaForm({
   const set = (patch: Partial<DatosTarea>) => setD((prev) => ({ ...prev, ...patch }));
 
   // Se puede asignar a cualquier persona activa; quien ya tiene la tarea sigue en la lista aunque esté desactivada.
-  const personas = perfiles.filter((p) => p.activo || p.id === tarea?.asignadaA);
+  const personas = perfiles.filter((p) => p.rol !== "cliente" && (p.activo || p.id === tarea?.asignadaA));
   // Lo mismo con las obras: las archivadas no se ofrecen, salvo la que ya tiene la tarea.
   const elegibles = obras.filter((o) => o.activa || o.id === tarea?.obraId);
   const cambiaResponsable = tarea && tarea.asignadaA && d.asignadaA && tarea.asignadaA !== d.asignadaA;
