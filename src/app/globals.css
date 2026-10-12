@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/* Estilos que solo aplican en modo oscuro: dark:opacity-80 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* La aplicación se ve como un libro de trabajo: papel cálido, tinta, reglas finas
+   y un resaltador como único acento. papel = fondo, hoja = superficies, tinta =
+   texto y botones, gris = texto secundario, regla = líneas, marca = resaltador,
+   alerta = vencido o urgente. Cada estado tiene además su propio color de sello. */
+:root {
+  --papel: #f2eee5;
+  --hoja: #faf8f2;
+  --tinta: #16130e;
+  --gris: #6a655b;
+  --regla: rgb(22 19 14 / 0.16);
+  --marca: #d9f24b;
+  --alerta: #cf3516;
+  color-scheme: light;
+
+  --e-borrador: #8c877c;
+  --e-asignada: #2b59c3;
+  --e-aclaracion: #a23e8c;
+  --e-aceptada: #0f8b8d;
+  --e-en_curso: #c98200;
+  --e-enviada: #5b4bc4;
+  --e-en_revision: #dd641c;
+  --e-devuelta: #cf3516;
+  --e-completada: #2e8b3d;
+}
+
+[data-theme="dark"] {
+  --papel: #12110e;
+  --hoja: #1b1915;
+  --tinta: #efeadf;
+  --gris: #a09a8d;
+  --regla: rgb(239 234 223 / 0.17);
+  --alerta: #ff6f4f;
+  color-scheme: dark;
+
+  --e-borrador: #9f998c;
+  --e-asignada: #7a9cf0;
+  --e-aclaracion: #d987c6;
+  --e-aceptada: #4cc4c6;
+  --e-en_curso: #f0b33c;
+  --e-enviada: #a195f5;
+  --e-en_revision: #f59553;
+  --e-devuelta: #ff6f4f;
+  --e-completada: #6cc97b;
+}
+
+@theme inline {
+  --color-papel: var(--papel);
+  --color-hoja: var(--hoja);
+  --color-tinta: var(--tinta);
+  --color-gris: var(--gris);
+  --color-regla: var(--regla);
+  --color-marca: var(--marca);
+  --color-alerta: var(--alerta);
+  --font-sans: var(--font-plex), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --animate-entrar: entrar 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes entrar {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+::selection {
+  background: var(--marca);
+  color: #16130e;
+}
+
+@layer components {
+  /* Texto pequeño de etiqueta: monoespaciado y en mayúsculas. */
+  .rotulo {
+    @apply font-mono text-[11px] uppercase tracking-[0.09em] text-gris;
+  }
+  /* Trazo de resaltador detrás de un texto. */
+  .resaltado {
+    background: linear-gradient(transparent 12%, var(--marca) 12%, var(--marca) 92%, transparent 92%);
+    color: #16130e;
+    @apply px-1.5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-[3px] border border-tinta bg-tinta px-4 py-2.5 text-sm font-semibold text-papel transition-all duration-150 hover:-translate-y-px hover:shadow-[3px_3px_0_var(--marca)] active:translate-y-0 active:shadow-none disabled:pointer-events-none disabled:opacity-40;
+  }
+  .btn-linea {
+    @apply bg-transparent text-tinta hover:bg-tinta hover:text-papel hover:shadow-none;
+  }
+  .btn-suave {
+    @apply border-transparent bg-transparent px-2 text-gris hover:translate-y-0 hover:text-tinta hover:shadow-none;
+  }
+  .campo {
+    @apply w-full rounded-[3px] border border-tinta/30 bg-hoja px-3 py-2.5 text-[15px] text-tinta outline-none transition-shadow placeholder:text-gris/60 focus:border-tinta focus:shadow-[3px_3px_0_var(--marca)];
+  }
+  .etiqueta {
+    @apply mb-1.5 block font-mono text-[11px] uppercase tracking-[0.09em] text-gris;
+  }
+  /* Bloque con borde: formularios y paneles. */
+  .hoja {
+    @apply rounded-[3px] border border-regla bg-hoja;
+  }
+  /* Filtro o pestaña. */
+  .pestana {
+    @apply shrink-0 border-b-2 border-transparent px-1 pb-2 text-sm font-medium whitespace-nowrap text-gris transition-colors hover:text-tinta;
+  }
+  .pestana-activa {
+    @apply border-tinta text-tinta;
+  }
+  /* Enlace de texto subrayado. */
+  .enlace {
+    @apply underline decoration-regla decoration-1 underline-offset-4 transition-colors hover:decoration-tinta;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
