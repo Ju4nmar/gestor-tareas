@@ -144,7 +144,10 @@ export function ListaTareas({
         <span className="rotulo">{t.campos.tarea}</span>
         <span className="rotulo">{conResponsable ? t.campos.responsable : ""}</span>
         <span className="rotulo">{t.campos.estado}</span>
-        <span className="rotulo sr-only">{t.campos.prioridad}</span>
+        {/* La columna de prioridad no lleva título visible, pero ocupa su lugar en la cuadrícula. */}
+        <span>
+          <span className="sr-only">{t.campos.prioridad}</span>
+        </span>
         <span className="rotulo text-right whitespace-nowrap">{t.campos.vence}</span>
       </div>
       {tareas.map((tarea) => (
