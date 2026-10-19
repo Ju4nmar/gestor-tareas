@@ -39,6 +39,8 @@ export type State = {
   cargado: boolean;
   error: boolean;
   tareas: Tarea[];
+  /** Tareas archivadas; solo las recibe el administrador. */
+  archivadas: Tarea[];
   eventos: Evento[];
   perfiles: Perfil[];
   obras: Obra[];
@@ -58,6 +60,7 @@ const initial: State = {
   cargado: false,
   error: false,
   tareas: [],
+  archivadas: [],
   eventos: [],
   perfiles: [],
   obras: [],
@@ -121,8 +124,11 @@ function ponerDemo(b: demo.Base) {
   const yo = b.perfiles.find((p) => p.id === b.yo) ?? null;
   const admin = yo?.rol === "admin";
   // El cliente no recibe tareas ni historial: solo el resumen de sus obras.
-  const tareas = admin ? b.tareas : b.tareas.filter((t) => t.asignadaA === b.yo);
-  const visibles = new Set(tareas.map((t) => t.id));
+  // Las archivadas solo las ve el administrador, y van aparte de las activas.
+  const activas = b.tareas.filter((t) => !t.archivada);
+  const tareas = admin ? activas : activas.filter((t) => t.asignadaA === b.yo);
+  const archivadas = admin ? b.tareas.filter((t) => t.archivada) : [];
+  const visibles = new Set([...tareas, ...archivadas].map((t) => t.id));
   set({
     listo: true,
     demo: true,
@@ -132,6 +138,7 @@ function ponerDemo(b: demo.Base) {
     cargado: true,
     error: false,
     tareas,
+    archivadas,
     eventos: b.eventos.filter((e) => visibles.has(e.tareaId)),
     perfiles: admin ? b.perfiles : b.perfiles.filter((p) => p.id === b.yo),
     obras: admin ? b.obras : b.obras.filter((o) => tareas.some((t) => t.obraId === o.id)),
@@ -204,6 +211,7 @@ type FilaTarea = {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  archived_at: string | null;
 };
 
 const aTarea = (f: FilaTarea): Tarea => ({
@@ -219,6 +227,7 @@ const aTarea = (f: FilaTarea): Tarea => ({
   creada: f.created_at,
   actualizada: f.updated_at,
   completada: f.completed_at,
+  archivada: f.archived_at,
 });
 
 type FilaEvento = {
@@ -323,10 +332,13 @@ export async function recargar() {
   if (tareas.error || eventos.error || perfiles.error || obras.error || archivos.error || clientes.error) {
     return set({ cargado: true, error: true });
   }
+  // Las archivadas llegan solo al administrador (lo decide la base de datos) y van aparte.
+  const filas = (tareas.data as FilaTarea[]).map(aTarea);
   set({
     cargado: true,
     error: false,
-    tareas: (tareas.data as FilaTarea[]).map(aTarea),
+    tareas: filas.filter((t) => !t.archivada),
+    archivadas: filas.filter((t) => t.archivada),
     eventos: (eventos.data as FilaEvento[]).map(aEvento),
     perfiles: (perfiles.data as FilaPerfil[]).map(aPerfil),
     obras: (obras.data as FilaObra[]).map(aObra),
@@ -388,6 +400,8 @@ const FALLOS = new Set<string>([
   "sesion",
   "obra",
   "con_tareas",
+  "archivada",
+  "no_archivada",
   "archivo",
 ]);
 
@@ -426,9 +440,26 @@ export const guardarTarea = (datos: DatosTarea, id: string | null = null) =>
     (b) => demo.guardarTarea(b, datos, id),
   );
 
+/** Archiva la tarea (se conserva con su historial y sus fotos) o la restaura. */
+export const archivarTarea = (id: string, archivar = true) =>
+  cambiar(
+    () => rpc<void>("tm_archive_task", { p_id: id, p_archive: archivar }),
+    (b) => demo.archivarTarea(b, id, archivar),
+  );
+
+/** Borra del todo una tarea ya archivada, con su historial y sus fotos. */
 export const borrarTarea = (id: string) =>
   cambiar(
-    () => rpc<void>("tm_delete_task", { p_id: id }),
+    async () => {
+      if (!state.archivadas.some((t) => t.id === id)) throw new ErrorFlujo("no_archivada");
+      // Primero las fotos: si el almacén fallara, la tarea sigue ahí y no quedan archivos sueltos.
+      const rutas = state.archivos.filter((a) => a.tareaId === id && a.ruta).map((a) => a.ruta);
+      if (rutas.length) {
+        const { error } = await supabase.storage.from(ALMACEN).remove(rutas);
+        if (error) throw new ErrorFlujo("error");
+      }
+      await rpc<void>("tm_delete_task", { p_id: id });
+    },
     (b) => demo.borrarTarea(b, id),
   );
 
@@ -549,7 +580,13 @@ export async function subirArchivos(tareaId: string, files: File[]) {
     const ruta = `${tareaId}/${crypto.randomUUID()}.${tipo === "image/jpeg" ? "jpg" : "pdf"}`;
     const { error } = await supabase.storage.from(ALMACEN).upload(ruta, blob, { contentType: tipo });
     if (error) throw new ErrorFlujo("archivo");
-    await rpc("tm_add_file", { p_task: tareaId, p_path: ruta, p_name: nombre, p_mime: tipo, p_size: blob.size });
+    try {
+      await rpc("tm_add_file", { p_task: tareaId, p_path: ruta, p_name: nombre, p_mime: tipo, p_size: blob.size });
+    } catch (e) {
+      // La base de datos no lo aceptó (por ejemplo, la tarea se archivó): no se deja suelto en el almacén.
+      await supabase.storage.from(ALMACEN).remove([ruta]);
+      throw e;
+    }
   }
   await recargar();
 }

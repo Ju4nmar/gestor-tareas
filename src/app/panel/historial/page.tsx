@@ -10,14 +10,15 @@ import { useT } from "@/lib/textos";
 const MAXIMO = 150;
 
 export default function HistorialPage() {
-  const { perfil, tareas, eventos, perfiles } = useStore();
+  const { perfil, tareas, archivadas, eventos, perfiles } = useStore();
   const { t, momento } = useT();
   const [vista, setVista] = useState<"actividad" | "completadas">("actividad");
   const [persona, setPersona] = useState("");
   if (!perfil) return null;
 
   const admin = perfil.rol === "admin";
-  const porId = new Map(tareas.map((x) => [x.id, x]));
+  // La actividad incluye las tareas archivadas: su historial se conserva y el enlace sigue abriéndolas.
+  const porId = new Map([...tareas, ...archivadas].map((x) => [x.id, x]));
   const actividad = eventos.filter((e) => !persona || e.actorId === persona).slice(0, MAXIMO);
   const completadas = tareas
     .filter((x) => x.estado === "completada")
