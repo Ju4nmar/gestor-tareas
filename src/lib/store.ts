@@ -447,17 +447,30 @@ export const archivarTarea = (id: string, archivar = true) =>
     (b) => demo.archivarTarea(b, id, archivar),
   );
 
-/** Borra del todo una tarea ya archivada, con su historial y sus fotos. */
+/**
+ * Borra del todo una tarea ya archivada, con su historial y sus fotos. Devuelve `true` si
+ * alguna foto no se pudo quitar del almacén: la tarea ya no existe, pero esas fotos siguen
+ * guardadas (ya sin enlace en la aplicación) y conviene avisar.
+ */
 export const borrarTarea = (id: string) =>
   cambiar(
     async () => {
       // La base de datos decide si se puede (solo archivadas) y devuelve las rutas de sus fotos.
       const rutas = await rpc<string[]>("tm_delete_task", { p_id: id });
-      // Las fotos se quitan DESPUÉS: si algo falla antes, no se pierde nada. Y si el almacén fallara
-      // ahora, quedarían sueltas pero invisibles: la tarea y sus registros ya no existen.
-      if (rutas?.length) await supabase.storage.from(ALMACEN).remove(rutas);
+      if (!rutas?.length) return false;
+      // Las fotos se quitan DESPUÉS: si algo falla antes, no se pierde nada. Dos intentos, porque
+      // la tarea ya no existe y no habría otra oportunidad de limpiar.
+      for (let intento = 0; intento < 2; intento++) {
+        const { error } = await supabase.storage.from(ALMACEN).remove(rutas);
+        if (!error) return false;
+      }
+      console.error("No se pudieron borrar estas fotos del almacén:", rutas);
+      return true;
     },
-    (b) => demo.borrarTarea(b, id),
+    (b) => {
+      demo.borrarTarea(b, id);
+      return false;
+    },
   );
 
 /** Da un paso del flujo (aceptar, enviar, aprobar…) o deja un comentario. */

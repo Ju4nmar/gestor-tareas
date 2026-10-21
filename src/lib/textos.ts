@@ -211,6 +211,8 @@ const es = {
     cuenta: (n: number) => (n === 1 ? "1 tarea" : `${n} tareas`),
     archivadas: "Archivadas",
     archivadasAyuda: "Solo las ves tú. Conservan su historial y sus fotos hasta que las elimines.",
+    avisoFotos:
+      "La tarea se eliminó, pero algunas de sus fotos no se pudieron borrar del almacenamiento. Ya no se muestran en la aplicación.",
   },
   formulario: {
     nueva: "Nueva tarea",
@@ -584,6 +586,8 @@ const en: typeof es = {
     cuenta: (n) => (n === 1 ? "1 task" : `${n} tasks`),
     archivadas: "Archived",
     archivadasAyuda: "Only you can see them. They keep their history and photos until you delete them.",
+    avisoFotos:
+      "The task was deleted, but some of its photos could not be removed from storage. They are no longer shown in the app.",
   },
   formulario: {
     nueva: "New task",

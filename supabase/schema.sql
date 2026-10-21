@@ -1444,8 +1444,12 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  v_archived timestamptz;
 begin
-  if exists (select 1 from public.tm_tasks where id = new.task_id and archived_at is not null) then
+  -- La tarea se bloquea mientras se comprueba: nadie puede archivarla justo en medio.
+  select archived_at into v_archived from public.tm_tasks where id = new.task_id for share;
+  if v_archived is not null then
     raise exception 'archivada';
   end if;
   return new;
@@ -1498,6 +1502,7 @@ as $$
 declare
   v_me uuid := private.tm_my_id();
   v_f public.tm_files;
+  v_archived timestamptz;
 begin
   select * into v_f from public.tm_files where id = p_id;
   if not found then
@@ -1506,7 +1511,9 @@ begin
   if v_me is null or not (private.tm_is_admin() or v_f.uploaded_by = v_me) then
     raise exception 'permiso';
   end if;
-  if exists (select 1 from public.tm_tasks where id = v_f.task_id and archived_at is not null) then
+  -- La tarea se bloquea mientras se quita el archivo: nadie puede archivarla justo en medio.
+  select archived_at into v_archived from public.tm_tasks where id = v_f.task_id for share;
+  if v_archived is not null then
     raise exception 'archivada';
   end if;
   delete from public.tm_files where id = p_id;

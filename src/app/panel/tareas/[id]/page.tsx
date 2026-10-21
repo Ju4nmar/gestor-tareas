@@ -242,8 +242,8 @@ export default function TareaPage() {
   };
   const borrar = async () => {
     try {
-      await borrarTarea(tarea.id);
-      router.replace("/panel/tareas");
+      const fotosSueltas = await borrarTarea(tarea.id);
+      router.replace(fotosSueltas ? "/panel/tareas?aviso=fotos" : "/panel/tareas");
     } catch (e) {
       setPorBorrar(false);
       setError(t.fallos[falloDe(e)]);

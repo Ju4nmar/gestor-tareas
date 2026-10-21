@@ -20,7 +20,15 @@ const sinTildes = (texto: string) =>
 
 const SIN_OBRA = "ninguna";
 
-function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; obraInicial: string }) {
+function Tareas({
+  estadoInicial,
+  obraInicial,
+  avisoFotos,
+}: {
+  estadoInicial: Estado | "";
+  obraInicial: string;
+  avisoFotos: boolean;
+}) {
   const { perfil, tareas, archivadas, perfiles, obras } = useStore();
   const { t } = useT();
   const hoy = useHoy();
@@ -92,6 +100,12 @@ function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; ob
           </button>
         )}
       </Encabezado>
+
+      {avisoFotos && (
+        <p role="status" className="hoja px-4 py-3 text-sm font-medium">
+          {t.tareas.avisoFotos}
+        </p>
+      )}
 
       {creando && (
         <TareaForm
@@ -244,7 +258,9 @@ export default function TareasPage() {
   const params = useSearchParams();
   const estado = params.get("estado") ?? "";
   const obra = params.get("obra") ?? "";
+  // Se llega con ?aviso=fotos cuando se eliminó una tarea pero alguna de sus fotos no se pudo borrar.
+  const avisoFotos = params.get("aviso") === "fotos";
   const valido = (ESTADOS as string[]).includes(estado) ? (estado as Estado) : "";
   // La key reinicia los filtros cuando se llega con otro estado u otra obra desde el tablero.
-  return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} />;
+  return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} avisoFotos={avisoFotos} />;
 }
