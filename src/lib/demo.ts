@@ -188,6 +188,8 @@ export function quitarArchivo(b: Base, id: string) {
   const archivo = b.archivos.find((a) => a.id === id);
   if (!archivo) throw new ErrorFlujo("no_existe");
   if (!yo || (yo.rol !== "admin" && archivo.subidoPor !== yo.id)) throw new ErrorFlujo("permiso");
+  // Una tarea archivada no se modifica: tampoco se le quitan archivos.
+  if (b.tareas.some((t) => t.id === archivo.tareaId && t.archivada)) throw new ErrorFlujo("archivada");
   b.archivos = b.archivos.filter((a) => a.id !== id);
 }
 
@@ -318,9 +320,10 @@ export function quitarInvitacion(b: Base, id: string) {
   if (!b.perfiles.some((p) => p.id === id && !p.userId)) throw new ErrorFlujo("activa");
   for (const t of b.tareas) {
     if (t.asignadaA !== id) continue;
-    // Las archivadas no se tocan: solo pierden al responsable, como en la base de datos.
-    if (t.archivada) t.asignadaA = null;
-    else if (t.estado !== "completada") Object.assign(t, { asignadaA: null, estado: "borrador" });
+    // Como en la base de datos: las pendientes vuelven a borrador; las completadas y las
+    // archivadas no se tocan, solo pierden al responsable porque ese perfil desaparece.
+    if (!t.archivada && t.estado !== "completada") t.estado = "borrador";
+    t.asignadaA = null;
   }
   b.perfiles = b.perfiles.filter((p) => p.id !== id);
   b.clientes = b.clientes.filter((c) => c.perfilId !== id);

@@ -451,14 +451,11 @@ export const archivarTarea = (id: string, archivar = true) =>
 export const borrarTarea = (id: string) =>
   cambiar(
     async () => {
-      if (!state.archivadas.some((t) => t.id === id)) throw new ErrorFlujo("no_archivada");
-      // Primero las fotos: si el almacén fallara, la tarea sigue ahí y no quedan archivos sueltos.
-      const rutas = state.archivos.filter((a) => a.tareaId === id && a.ruta).map((a) => a.ruta);
-      if (rutas.length) {
-        const { error } = await supabase.storage.from(ALMACEN).remove(rutas);
-        if (error) throw new ErrorFlujo("error");
-      }
-      await rpc<void>("tm_delete_task", { p_id: id });
+      // La base de datos decide si se puede (solo archivadas) y devuelve las rutas de sus fotos.
+      const rutas = await rpc<string[]>("tm_delete_task", { p_id: id });
+      // Las fotos se quitan DESPUÉS: si algo falla antes, no se pierde nada. Y si el almacén fallara
+      // ahora, quedarían sueltas pero invisibles: la tarea y sus registros ya no existen.
+      if (rutas?.length) await supabase.storage.from(ALMACEN).remove(rutas);
     },
     (b) => demo.borrarTarea(b, id),
   );

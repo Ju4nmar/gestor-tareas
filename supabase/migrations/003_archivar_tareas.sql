@@ -216,10 +216,43 @@ begin
 end;
 $$;
 
+-- Quitar un archivo: el administrador o quien lo subió, y nunca de una tarea archivada
+-- (una tarea archivada no se modifica). Devuelve su ruta para borrarlo del almacén.
+create or replace function private.tm_remove_file(p_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_me uuid := private.tm_my_id();
+  v_f public.tm_files;
+begin
+  select * into v_f from public.tm_files where id = p_id;
+  if not found then
+    raise exception 'no_existe';
+  end if;
+  if v_me is null or not (private.tm_is_admin() or v_f.uploaded_by = v_me) then
+    raise exception 'permiso';
+  end if;
+  if exists (select 1 from public.tm_tasks where id = v_f.task_id and archived_at is not null) then
+    raise exception 'archivada';
+  end if;
+  delete from public.tm_files where id = p_id;
+  return v_f.path;
+end;
+$$;
+
 -- Borrar del todo: solo una tarea archivada (se lleva su historial y sus archivos).
--- Las fotos del almacén las quita la aplicación antes de llamar a esta función.
-create or replace function private.tm_delete_task(p_id uuid)
-returns void
+-- Devuelve las rutas de sus fotos para que la aplicación las quite del almacén DESPUÉS
+-- de que esto haya salido bien: así nunca se pierden fotos de una tarea que sigue ahí.
+-- La fila se bloquea mientras se decide, para que nadie pueda restaurarla justo en medio.
+-- Cambia lo que devuelve (antes nada), por eso se vuelve a crear en vez de reemplazarla.
+drop function if exists public.tm_delete_task(uuid);
+drop function if exists private.tm_delete_task(uuid);
+
+create function private.tm_delete_task(p_id uuid)
+returns text[]
 language plpgsql
 security definer
 set search_path = ''
@@ -227,17 +260,29 @@ as $$
 declare
   v_admin uuid := private.tm_require_admin();
   v_archived timestamptz;
+  v_paths text[];
 begin
-  select archived_at into v_archived from public.tm_tasks where id = p_id;
+  select archived_at into v_archived from public.tm_tasks where id = p_id for update;
   if not found then
     raise exception 'no_existe';
   end if;
   if v_archived is null then
     raise exception 'no_archivada';
   end if;
-  delete from public.tm_tasks where id = p_id;
+  select coalesce(array_agg(path), '{}'::text[]) into v_paths from public.tm_files where task_id = p_id;
+  delete from public.tm_tasks where id = p_id and archived_at is not null;
+  return v_paths;
 end;
 $$;
+
+create function public.tm_delete_task(p_id uuid)
+returns text[] language sql security invoker set search_path = ''
+as $$ select private.tm_delete_task(p_id); $$;
+
+revoke execute on function private.tm_delete_task(uuid) from public, anon;
+revoke execute on function public.tm_delete_task(uuid) from public, anon;
+grant execute on function private.tm_delete_task(uuid) to authenticated;
+grant execute on function public.tm_delete_task(uuid) to authenticated;
 
 create or replace function public.tm_archive_task(p_id uuid, p_archive boolean)
 returns void language sql security invoker set search_path = ''
