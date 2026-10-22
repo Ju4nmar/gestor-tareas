@@ -20,8 +20,16 @@ const sinTildes = (texto: string) =>
 
 const SIN_OBRA = "ninguna";
 
-function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; obraInicial: string }) {
-  const { perfil, tareas, perfiles, obras } = useStore();
+function Tareas({
+  estadoInicial,
+  obraInicial,
+  avisoFotos,
+}: {
+  estadoInicial: Estado | "";
+  obraInicial: string;
+  avisoFotos: boolean;
+}) {
+  const { perfil, tareas, archivadas, perfiles, obras } = useStore();
   const { t } = useT();
   const hoy = useHoy();
   const router = useRouter();
@@ -56,6 +64,12 @@ function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; ob
   const estados = ESTADOS.filter((e) =>
     vista === "todas" ? true : vista === "abiertas" ? e !== "completada" : e === "completada",
   );
+  // Las archivadas solo las ve el administrador: siguen el filtro de obra y van al final, las últimas primero.
+  const archivadasVista = admin
+    ? archivadas
+        .filter((x) => !obra || (obra === SIN_OBRA ? !x.obraId : x.obraId === obra))
+        .sort((a: Tarea, b: Tarea) => (b.archivada ?? "").localeCompare(a.archivada ?? ""))
+    : [];
   // Se ofrecen las obras activas y cualquier otra que tenga tareas a la vista.
   const conTareas = new Set(tareas.map((x) => x.obraId));
   const opciones = [
@@ -86,6 +100,12 @@ function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; ob
           </button>
         )}
       </Encabezado>
+
+      {avisoFotos && (
+        <p role="status" className="hoja px-4 py-3 text-sm font-medium">
+          {t.tareas.avisoFotos}
+        </p>
+      )}
 
       {creando && (
         <TareaForm
@@ -219,6 +239,17 @@ function Tareas({ estadoInicial, obraInicial }: { estadoInicial: Estado | ""; ob
       ) : (
         <ListaTareas tareas={lista} conResponsable={admin} conObra={!obra} />
       )}
+
+      {archivadasVista.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="flex items-baseline justify-between gap-3 font-display text-xl font-bold tracking-tight">
+            {t.tareas.archivadas}
+            <span className="font-mono text-xs font-normal text-gris">{t.tareas.cuenta(archivadasVista.length)}</span>
+          </h2>
+          <p className="text-sm text-gris">{t.tareas.archivadasAyuda}</p>
+          <ListaTareas tareas={archivadasVista} conResponsable conObra={!obra} />
+        </section>
+      )}
     </div>
   );
 }
@@ -227,7 +258,9 @@ export default function TareasPage() {
   const params = useSearchParams();
   const estado = params.get("estado") ?? "";
   const obra = params.get("obra") ?? "";
+  // Se llega con ?aviso=fotos cuando se eliminó una tarea pero alguna de sus fotos no se pudo borrar.
+  const avisoFotos = params.get("aviso") === "fotos";
   const valido = (ESTADOS as string[]).includes(estado) ? (estado as Estado) : "";
   // La key reinicia los filtros cuando se llega con otro estado u otra obra desde el tablero.
-  return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} />;
+  return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} avisoFotos={avisoFotos} />;
 }

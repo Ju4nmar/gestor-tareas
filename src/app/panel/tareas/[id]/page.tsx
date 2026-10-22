@@ -7,7 +7,7 @@ import { Elegidos, Elegir, Galeria } from "@/components/Archivos";
 import { TareaForm } from "@/components/TareaForm";
 import { Barras, SIN_MENSAJE, Sello, Vence, falloDe, frase, useNombres, useObras } from "@/components/ui";
 import { ESPERA_ADMIN, NOTA_MAXIMA, NOTA_MINIMA, REGLAS, codigoTarea, pasosDisponibles } from "@/lib/flujo";
-import { actuar, borrarTarea, subirArchivos, useStore } from "@/lib/store";
+import { actuar, archivarTarea, borrarTarea, subirArchivos, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Accion, Evento, Perfil, Tarea } from "@/lib/types";
 
@@ -204,7 +204,7 @@ export default function TareaPage() {
   const { id } = useParams<{ id: string }>();
   // Se llega con ?aviso=archivo cuando la tarea se creó pero alguno de sus archivos no subió.
   const sinArchivos = useSearchParams().get("aviso") === "archivo";
-  const { perfil, tareas, eventos } = useStore();
+  const { perfil, tareas, archivadas, eventos } = useStore();
   const { t, diaLargo, momento } = useT();
   const nombre = useNombres();
   const obra = useObras();
@@ -215,7 +215,8 @@ export default function TareaPage() {
   // Confirma en palabras el paso que se acaba de dar.
   const [hecho, setHecho] = useState(false);
 
-  const tarea = tareas.find((x) => x.id === id);
+  // Las archivadas (solo las recibe el administrador) se abren igual, pero sin poder modificarlas.
+  const tarea = tareas.find((x) => x.id === id) ?? archivadas.find((x) => x.id === id);
   if (!perfil) return null;
   if (!tarea) {
     return (
@@ -230,11 +231,21 @@ export default function TareaPage() {
 
   const admin = perfil.rol === "admin";
   const historial = eventos.filter((e) => e.tareaId === tarea.id);
+  // Archivar y restaurar: la tarea se queda en esta página, ahora con su nuevo aspecto.
+  const archivar = async (archivando: boolean) => {
+    setError("");
+    try {
+      await archivarTarea(tarea.id, archivando);
+    } catch (e) {
+      setError(t.fallos[falloDe(e)]);
+    }
+  };
   const borrar = async () => {
     try {
-      await borrarTarea(tarea.id);
-      router.replace("/panel/tareas");
+      const fotosSueltas = await borrarTarea(tarea.id);
+      router.replace(fotosSueltas ? "/panel/tareas?aviso=fotos" : "/panel/tareas");
     } catch (e) {
+      setPorBorrar(false);
       setError(t.fallos[falloDe(e)]);
     }
   };
@@ -278,6 +289,7 @@ export default function TareaPage() {
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <span className="font-mono text-sm text-gris">{codigoTarea(tarea.numero)}</span>
               <Sello estado={tarea.estado} />
+              {tarea.archivada && <span className="rotulo border border-tinta px-2 py-0.5">{t.obras.archivada}</span>}
               <Vence tarea={tarea} />
             </div>
             <h1 className="mt-3 font-display text-3xl font-extrabold leading-[1.05] tracking-tight sm:text-[2.6rem]">
@@ -285,23 +297,36 @@ export default function TareaPage() {
             </h1>
             {admin && (
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                <button className="enlace py-1" onClick={() => setEditando(true)}>
-                  {t.detalle.editar}
-                </button>
-                {porBorrar ? (
-                  <span>
-                    {t.detalle.eliminarSeguro}
-                    <button className="enlace ml-3 py-1 font-semibold text-alerta" onClick={() => void borrar()}>
-                      {t.detalle.eliminarSi}
+                {tarea.archivada ? (
+                  <>
+                    <button className="enlace py-1" onClick={() => void archivar(false)}>
+                      {t.detalle.restaurar}
                     </button>
-                    <button className="enlace ml-3 py-1" onClick={() => setPorBorrar(false)}>
-                      {t.comun.no}
-                    </button>
-                  </span>
+                    {porBorrar ? (
+                      <span>
+                        {t.detalle.eliminarSeguro}
+                        <button className="enlace ml-3 py-1 font-semibold text-alerta" onClick={() => void borrar()}>
+                          {t.detalle.eliminarSi}
+                        </button>
+                        <button className="enlace ml-3 py-1" onClick={() => setPorBorrar(false)}>
+                          {t.comun.no}
+                        </button>
+                      </span>
+                    ) : (
+                      <button className="enlace py-1 text-gris hover:text-tinta" onClick={() => setPorBorrar(true)}>
+                        {t.detalle.eliminar}
+                      </button>
+                    )}
+                  </>
                 ) : (
-                  <button className="enlace py-1 text-gris hover:text-tinta" onClick={() => setPorBorrar(true)}>
-                    {t.detalle.eliminar}
-                  </button>
+                  <>
+                    <button className="enlace py-1" onClick={() => setEditando(true)}>
+                      {t.detalle.editar}
+                    </button>
+                    <button className="enlace py-1 text-gris hover:text-tinta" onClick={() => void archivar(true)}>
+                      {t.detalle.archivar}
+                    </button>
+                  </>
                 )}
                 {error && <span className="font-medium text-alerta">{error}</span>}
               </div>
@@ -315,6 +340,11 @@ export default function TareaPage() {
                   {t.fallos.archivo}
                 </p>
               )}
+              {tarea.archivada && (
+                <p role="status" className="hoja px-4 py-3 text-sm font-medium">
+                  {t.detalle.archivadaAviso}
+                </p>
+              )}
               {hecho && (
                 <p role="status" className="flex items-center gap-3 font-medium">
                   <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center bg-marca text-[#16130e]">
@@ -323,7 +353,9 @@ export default function TareaPage() {
                   {t.detalle.hecho(t.estados[tarea.estado])}
                 </p>
               )}
-              <Pasos key={`${tarea.estado}-${perfil.id}`} tarea={tarea} perfil={perfil} onHecho={() => setHecho(true)} />
+              {!tarea.archivada && (
+                <Pasos key={`${tarea.estado}-${perfil.id}`} tarea={tarea} perfil={perfil} onHecho={() => setHecho(true)} />
+              )}
               <section>
                 <h2 className="rotulo mb-2">{t.campos.descripcion}</h2>
                 <p className="max-w-2xl whitespace-pre-wrap text-[17px] leading-relaxed">
@@ -335,9 +367,11 @@ export default function TareaPage() {
               <div className="lg:hidden">{ficha}</div>
               <section>
                 <h2 className="mb-3 font-display text-xl font-bold tracking-tight">{t.detalle.historial}</h2>
-                <div className="mb-4">
-                  <Comentar tarea={tarea} />
-                </div>
+                {!tarea.archivada && (
+                  <div className="mb-4">
+                    <Comentar tarea={tarea} />
+                  </div>
+                )}
                 <Linea eventos={historial} />
               </section>
             </div>

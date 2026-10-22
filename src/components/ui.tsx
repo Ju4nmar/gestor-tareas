@@ -107,7 +107,16 @@ export function frase(t: Textos, e: Evento) {
 }
 
 /** Sucesos cuya nota es un dato (un nombre, una lista de campos) y no un mensaje. */
-export const SIN_MENSAJE = new Set<Evento["suceso"]>(["crear", "asignar", "reasignar", "desasignar", "editar", "adjuntar"]);
+export const SIN_MENSAJE = new Set<Evento["suceso"]>([
+  "crear",
+  "asignar",
+  "reasignar",
+  "desasignar",
+  "editar",
+  "adjuntar",
+  "archivar",
+  "restaurar",
+]);
 
 /** Nombre de quien tiene la tarea, o "Sin asignar". */
 export function useNombres() {

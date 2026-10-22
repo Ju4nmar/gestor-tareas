@@ -143,7 +143,9 @@ export function Galeria({ tarea }: { tarea: Tarea }) {
   };
 
   const grande = archivos.find((a) => a.id === abierta);
-  const puedeQuitar = (a: Archivo) => perfil.rol === "admin" || a.subidoPor === perfil.id;
+  // Una tarea archivada solo se mira: no se suben ni se quitan archivos.
+  const soloLectura = Boolean(tarea.archivada);
+  const puedeQuitar = (a: Archivo) => !soloLectura && (perfil.rol === "admin" || a.subidoPor === perfil.id);
 
   return (
     <section>
@@ -206,10 +208,14 @@ export function Galeria({ tarea }: { tarea: Tarea }) {
         </ul>
       )}
 
-      <Elegir onElegir={(files) => void subir(files)} ocupado={subiendo} />
-      <p className="mt-2 text-xs text-gris" aria-live="polite">
-        {subiendo ? t.archivos.subiendo : t.archivos.ayuda}
-      </p>
+      {!soloLectura && (
+        <>
+          <Elegir onElegir={(files) => void subir(files)} ocupado={subiendo} />
+          <p className="mt-2 text-xs text-gris" aria-live="polite">
+            {subiendo ? t.archivos.subiendo : t.archivos.ayuda}
+          </p>
+        </>
+      )}
       {error && (
         <p role="alert" className="mt-2 text-sm font-medium text-alerta">
           {error}

@@ -29,7 +29,16 @@ export type Accion =
   | "comentar";
 
 /** Lo que puede quedar en el historial: los pasos del flujo y los cambios del administrador. */
-export type Suceso = Accion | "crear" | "asignar" | "reasignar" | "desasignar" | "editar" | "adjuntar";
+export type Suceso =
+  | Accion
+  | "crear"
+  | "asignar"
+  | "reasignar"
+  | "desasignar"
+  | "editar"
+  | "adjuntar"
+  | "archivar"
+  | "restaurar";
 
 export type Perfil = {
   id: string;
@@ -87,6 +96,8 @@ export type Tarea = {
   creada: string;
   actualizada: string;
   completada: string | null;
+  /** Fecha en que se archivó; nulo si está activa. Solo el administrador ve las archivadas. */
+  archivada: string | null;
 };
 
 export type Evento = {
@@ -150,6 +161,8 @@ export type Fallo =
   | "clave"
   | "obra"
   | "con_tareas"
+  | "archivada"
+  | "no_archivada"
   | "archivo"
   | "archivo_tipo"
   | "archivo_grande"

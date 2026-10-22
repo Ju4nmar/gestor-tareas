@@ -87,6 +87,7 @@ export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fech
       creada: fecha,
       actualizada: fecha,
       completada: null,
+      archivada: null,
     };
     b.tareas.unshift(tarea);
     anotar(b, tarea.id, admin, "crear", null, "borrador", "", fecha);
@@ -96,6 +97,7 @@ export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fech
 
   const tarea = b.tareas.find((t) => t.id === id);
   if (!tarea) throw new ErrorFlujo("no_existe");
+  if (tarea.archivada) throw new ErrorFlujo("archivada");
   const movida = tarea.asignadaA !== datos.asignadaA;
   if (movida && tarea.estado === "completada") throw new ErrorFlujo("completada");
   const cambios: string[] = (["titulo", "descripcion", "prioridad", "vence"] as const).filter(
@@ -114,9 +116,23 @@ export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fech
   return id;
 }
 
+/** Archiva la tarea o la restaura; queda anotado en su historial. */
+export function archivarTarea(b: Base, id: string, archivar: boolean, fecha = ahoraIso()) {
+  const admin = administrador(b);
+  const tarea = b.tareas.find((t) => t.id === id);
+  if (!tarea) throw new ErrorFlujo("no_existe");
+  if (Boolean(tarea.archivada) === archivar) return;
+  tarea.archivada = archivar ? fecha : null;
+  tarea.actualizada = fecha;
+  anotar(b, id, admin, archivar ? "archivar" : "restaurar", tarea.estado, tarea.estado, "", fecha);
+}
+
+/** Borra del todo una tarea, con su historial y sus archivos. Solo si ya está archivada. */
 export function borrarTarea(b: Base, id: string) {
   administrador(b);
-  if (!b.tareas.some((t) => t.id === id)) throw new ErrorFlujo("no_existe");
+  const tarea = b.tareas.find((t) => t.id === id);
+  if (!tarea) throw new ErrorFlujo("no_existe");
+  if (!tarea.archivada) throw new ErrorFlujo("no_archivada");
   b.tareas = b.tareas.filter((t) => t.id !== id);
   b.eventos = b.eventos.filter((e) => e.tareaId !== id);
   b.archivos = b.archivos.filter((a) => a.tareaId !== id);
@@ -128,6 +144,7 @@ export function actuar(b: Base, id: string, accion: Accion, nota: string, fecha 
   const tarea = b.tareas.find((t) => t.id === id);
   if (!tarea) throw new ErrorFlujo("no_existe");
   if (tarea.asignadaA !== yo.id && yo.rol !== "admin") throw new ErrorFlujo("permiso");
+  if (tarea.archivada) throw new ErrorFlujo("archivada");
   if (!puede(accion, tarea, yo)) throw new ErrorFlujo("transicion");
   const regla = REGLAS[accion];
   const texto = nota.trim();
@@ -152,6 +169,7 @@ export function adjuntar(
   const yo = b.perfiles.find((p) => p.id === b.yo && p.activo);
   const tarea = b.tareas.find((t) => t.id === tareaId);
   if (!yo || !tarea || (tarea.asignadaA !== yo.id && yo.rol !== "admin")) throw new ErrorFlujo("permiso");
+  if (tarea.archivada) throw new ErrorFlujo("archivada");
   b.archivos.unshift({
     ...archivo,
     id: `a${++b.sec}`,
@@ -170,6 +188,8 @@ export function quitarArchivo(b: Base, id: string) {
   const archivo = b.archivos.find((a) => a.id === id);
   if (!archivo) throw new ErrorFlujo("no_existe");
   if (!yo || (yo.rol !== "admin" && archivo.subidoPor !== yo.id)) throw new ErrorFlujo("permiso");
+  // Una tarea archivada no se modifica: tampoco se le quitan archivos.
+  if (b.tareas.some((t) => t.id === archivo.tareaId && t.archivada)) throw new ErrorFlujo("archivada");
   b.archivos = b.archivos.filter((a) => a.id !== id);
 }
 
@@ -240,7 +260,7 @@ export function vistaCliente(b: Base): ObraCliente[] {
   return b.obras
     .filter((o) => b.clientes.some((c) => c.obraId === o.id && c.perfilId === b.yo))
     .map((o) => {
-      const tareas = b.tareas.filter((t) => t.obraId === o.id).sort((x, y) => x.numero - y.numero);
+      const tareas = b.tareas.filter((t) => t.obraId === o.id && !t.archivada).sort((x, y) => x.numero - y.numero);
       const ids = new Set(tareas.map((t) => t.id));
       return {
         ...o,
@@ -299,7 +319,11 @@ export function quitarInvitacion(b: Base, id: string) {
   administrador(b);
   if (!b.perfiles.some((p) => p.id === id && !p.userId)) throw new ErrorFlujo("activa");
   for (const t of b.tareas) {
-    if (t.asignadaA === id && t.estado !== "completada") Object.assign(t, { asignadaA: null, estado: "borrador" });
+    if (t.asignadaA !== id) continue;
+    // Como en la base de datos: las pendientes vuelven a borrador; las completadas y las
+    // archivadas no se tocan, solo pierden al responsable porque ese perfil desaparece.
+    if (!t.archivada && t.estado !== "completada") t.estado = "borrador";
+    t.asignadaA = null;
   }
   b.perfiles = b.perfiles.filter((p) => p.id !== id);
   b.clientes = b.clientes.filter((c) => c.perfilId !== id);
