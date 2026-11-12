@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { useHoy } from "@/lib/fechas";
-import { ErrorFlujo, abierta, codigoTarea, diasRestantes, vencida } from "@/lib/flujo";
+import { ErrorFlujo, abierta, codigoTarea, diasInvitacion, diasRestantes, vencida } from "@/lib/flujo";
 import { useStore } from "@/lib/store";
 import { type Textos, cambiarIdioma, useT } from "@/lib/textos";
 import type { Estado, Evento, Fallo, Prioridad, Tarea } from "@/lib/types";
@@ -90,6 +90,46 @@ export function Vence({ tarea, className = "" }: { tarea: Tarea; className?: str
     <span className={`font-mono text-xs whitespace-nowrap ${dias < 0 ? "font-medium text-alerta" : ""} ${className}`}>
       {fecha} · {dias === 0 ? <span className="resaltado">{falta}</span> : falta}
     </span>
+  );
+}
+
+/** Vigencia de un enlace de invitación pendiente. */
+export function VigenciaInvitacion({ vence }: { vence: string | null }) {
+  const { t } = useT();
+  const hoy = useHoy();
+  const dias = diasInvitacion(vence, hoy);
+  if (dias === null) return null;
+  return dias < 0 ? (
+    <span className="font-medium text-alerta">{t.equipo.invitacionVencida}</span>
+  ) : (
+    <span>{t.equipo.invitacionVence(dias)}</span>
+  );
+}
+
+type InvitacionPendiente = { id: string; codigo: string | null; invitacionVence: string | null };
+
+/** Acciones disponibles para un enlace pendiente, ocultando copiar cuando ya venció. */
+export function AccionesInvitacion({ perfil, copiado, onCopiar, onRenovar }: {
+  perfil: InvitacionPendiente;
+  copiado: string;
+  onCopiar: (codigo: string) => void;
+  onRenovar: (id: string) => void;
+}) {
+  const { t } = useT();
+  const hoy = useHoy();
+  const dias = diasInvitacion(perfil.invitacionVence, hoy);
+  const vencida = dias !== null && dias < 0;
+  return (
+    <>
+      {perfil.codigo && !vencida && (
+        <button className="enlace py-1 font-medium" onClick={() => onCopiar(perfil.codigo!)}>
+          {copiado === perfil.codigo ? t.equipo.copiado : t.equipo.enlace}
+        </button>
+      )}
+      <button className={`enlace py-1 ${vencida ? "font-medium" : "text-gris hover:text-tinta"}`} onClick={() => onRenovar(perfil.id)}>
+        {t.equipo.renovar}
+      </button>
+    </>
   );
 }
 

@@ -50,6 +50,8 @@ export type Perfil = {
   activo: boolean;
   /** Código de invitación pendiente; solo lo ve el administrador. */
   codigo: string | null;
+  /** Hasta cuándo vale el código de una invitación pendiente; nulo si ya no hay invitación. */
+  invitacionVence: string | null;
   creado: string;
 };
 
@@ -154,6 +156,7 @@ export type Fallo =
   | "ultimo_admin"
   | "activa"
   | "invitacion"
+  | "invitacion_vencida"
   | "ya_activa"
   | "sesion"
   | "credenciales"

@@ -184,6 +184,7 @@ type FilaPerfil = {
   role: Rol;
   active: boolean;
   invite_code?: string | null;
+  invite_expires_at?: string | null;
   created_at: string;
 };
 
@@ -195,6 +196,7 @@ const aPerfil = (f: FilaPerfil): Perfil => ({
   rol: f.role,
   activo: f.active,
   codigo: f.invite_code ?? null,
+  invitacionVence: f.invite_expires_at ?? null,
   creado: f.created_at,
 });
 
@@ -396,6 +398,7 @@ const FALLOS = new Set<string>([
   "ultimo_admin",
   "activa",
   "invitacion",
+  "invitacion_vencida",
   "ya_activa",
   "sesion",
   "obra",
@@ -494,6 +497,16 @@ export const actualizarPerfil = (id: string, nombre: string, rol: Rol, activo: b
   cambiar(
     () => rpc<void>("tm_update_profile", { p_id: id, p_name: nombre, p_role: rol, p_active: activo }),
     (b) => demo.actualizarPerfil(b, id, nombre, rol, activo),
+  );
+
+/**
+ * Renueva una invitación que nadie ha activado: código nuevo y otros siete días, con el mismo
+ * perfil y las mismas obras. Devuelve el código nuevo.
+ */
+export const renovarInvitacion = (id: string) =>
+  cambiar(
+    () => rpc<FilaPerfil>("tm_renew_invite", { p_id: id }).then((fila) => fila.invite_code ?? ""),
+    (b) => demo.renovarInvitacion(b, id),
   );
 
 export const quitarInvitacion = (id: string) =>
@@ -644,10 +657,17 @@ export async function salir() {
   await supabase.auth.signOut();
 }
 
-/** Nombre y correo de una invitación pendiente, o nulo si el código no sirve. */
-export async function infoInvitacion(codigo: string) {
+/**
+ * Nombre y correo de una invitación pendiente; `{ vencida: true }` si su código ya venció
+ * (no se revela a quién era); nulo si el código no sirve.
+ */
+export type InfoInvitacion = { name: string; email: string } | { vencida: true } | null;
+
+export async function infoInvitacion(codigo: string): Promise<InfoInvitacion> {
   const { data } = await supabase.rpc("tm_invite_info", { p_code: codigo });
-  return (data as { name: string; email: string } | null) ?? null;
+  if (!data) return null;
+  if ((data as { expired?: boolean }).expired) return { vencida: true };
+  return data as { name: string; email: string };
 }
 
 /** Une la sesión actual con su invitación y carga el perfil. */

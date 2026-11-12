@@ -8,7 +8,7 @@ import { Cargando, falloDe } from "@/components/ui";
 import { activar, activarConSesion, infoInvitacion, salir, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 
-type Invitacion = { name: string; email: string };
+type Invitacion = { name: string; email: string } | { vencida: true };
 
 export default function ActivarPage() {
   const { listo, perfil, email } = useStore();
@@ -53,7 +53,7 @@ export default function ActivarPage() {
 
   const crear = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!invitacion) return;
+    if (!invitacion || "vencida" in invitacion) return;
     const data = new FormData(event.currentTarget);
     if (data.get("clave") !== data.get("repetir")) return setError(t.activar.distintas);
     void intentar(() => activar(codigo, invitacion.email, String(data.get("clave"))));
@@ -70,6 +70,8 @@ export default function ActivarPage() {
             {t.activar.irEntrar}
           </Link>
         </>
+      ) : "vencida" in invitacion ? (
+        <p className="mt-4 leading-relaxed text-gris">{t.activar.vencida}</p>
       ) : porConfirmar ? (
         <p className="hoja mt-6 p-4 leading-relaxed">{t.activar.confirmar(invitacion.email)}</p>
       ) : email ? (

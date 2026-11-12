@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Encabezado, Seccion, copiarInvitacion, falloDe } from "@/components/ui";
+import { AccionesInvitacion, Encabezado, Seccion, VigenciaInvitacion, copiarInvitacion, falloDe } from "@/components/ui";
 import { abierta } from "@/lib/flujo";
-import { actualizarPerfil, invitar, quitarInvitacion, useStore } from "@/lib/store";
+import { actualizarPerfil, invitar, quitarInvitacion, renovarInvitacion, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Perfil, Rol } from "@/lib/types";
 
@@ -41,6 +41,15 @@ export default function EquipoPage() {
 
   const copiar = async (codigo: string) => {
     if (await copiarInvitacion(codigo, t.equipo.enlace)) setCopiado(codigo);
+  };
+
+  const renovar = async (id: string) => {
+    setError("");
+    try {
+      await copiar(await renovarInvitacion(id));
+    } catch (e) {
+      setError(t.fallos[falloDe(e)]);
+    }
   };
 
   // Los clientes se invitan desde cada obra y no cambian de rol: van en su propia lista.
@@ -121,7 +130,7 @@ export default function EquipoPage() {
                   {yo && <span className="resaltado font-mono text-[11px] uppercase">{t.equipo.tu}</span>}
                 </div>
                 <p className="mt-0.5 truncate font-mono text-xs text-gris">
-                  {p.email} · {pendiente ? t.comun.pendiente : p.activo ? t.equipo.abiertas(abiertasDe(p.id)) : t.comun.inactivo}
+                  {p.email} · {pendiente ? <>{t.comun.pendiente} · <VigenciaInvitacion vence={p.invitacionVence} /></> : p.activo ? t.equipo.abiertas(abiertasDe(p.id)) : t.comun.inactivo}
                 </p>
               </div>
 
@@ -137,11 +146,7 @@ export default function EquipoPage() {
               </select>
 
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm lg:justify-end">
-                {pendiente && p.codigo && (
-                  <button className="enlace font-medium" onClick={() => void copiar(p.codigo!)}>
-                    {copiado === p.codigo ? t.equipo.copiado : t.equipo.enlace}
-                  </button>
-                )}
+                {pendiente && <AccionesInvitacion perfil={p} copiado={copiado} onCopiar={copiar} onRenovar={renovar} />}
                 {pendiente ? (
                   <button className="enlace text-gris hover:text-tinta" onClick={() => void intentar(() => quitarInvitacion(p.id))}>
                     {t.equipo.retirar}
@@ -171,15 +176,11 @@ export default function EquipoPage() {
                 <div className="min-w-0">
                   <p className="text-lg font-semibold">{p.nombre}</p>
                   <p className="mt-0.5 truncate font-mono text-xs text-gris">
-                    {p.email} · {!p.userId ? t.comun.pendiente : p.activo ? t.equipo.sigue(obrasDe(p.id) || t.equipo.sinObra) : t.comun.inactivo}
+                    {p.email} · {!p.userId ? <>{t.comun.pendiente} · <VigenciaInvitacion vence={p.invitacionVence} /></> : p.activo ? t.equipo.sigue(obrasDe(p.id) || t.equipo.sinObra) : t.comun.inactivo}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm lg:justify-end">
-                  {!p.userId && p.codigo && (
-                    <button className="enlace font-medium" onClick={() => void copiar(p.codigo!)}>
-                      {copiado === p.codigo ? t.equipo.copiado : t.equipo.enlace}
-                    </button>
-                  )}
+                  {!p.userId && <AccionesInvitacion perfil={p} copiado={copiado} onCopiar={copiar} onRenovar={renovar} />}
                   {p.userId && (
                     <button className="enlace text-gris hover:text-tinta" onClick={() => void cambiar(p, { activo: !p.activo })}>
                       {p.activo ? t.equipo.desactivar : t.equipo.reactivar}

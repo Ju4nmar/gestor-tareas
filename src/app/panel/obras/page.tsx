@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Avance, Encabezado, Seccion, copiarInvitacion, falloDe } from "@/components/ui";
+import { AccionesInvitacion, Avance, Encabezado, Seccion, VigenciaInvitacion, copiarInvitacion, falloDe } from "@/components/ui";
 import { useHoy } from "@/lib/fechas";
 import { abierta, vencida } from "@/lib/flujo";
-import { borrarObra, guardarObra, invitarCliente, quitarCliente, useStore } from "@/lib/store";
+import { borrarObra, guardarObra, invitarCliente, quitarCliente, renovarInvitacion, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Obra, Perfil, Tarea } from "@/lib/types";
 
@@ -133,6 +133,19 @@ function Clientes({ obra, clientes }: { obra: Obra; clientes: Perfil[] }) {
     }
   };
 
+  const copiar = async (codigo: string) => {
+    if (await copiarInvitacion(codigo, t.equipo.enlace)) setCopiado(codigo);
+  };
+
+  const renovar = async (id: string) => {
+    setError("");
+    try {
+      await copiar(await renovarInvitacion(id));
+    } catch (e) {
+      setError(t.fallos[falloDe(e)]);
+    }
+  };
+
   const quitar = async (perfilId: string) => {
     setPorQuitar("");
     setRecien(false);
@@ -153,17 +166,10 @@ function Clientes({ obra, clientes }: { obra: Obra; clientes: Perfil[] }) {
             <p className="font-medium">{c.nombre}</p>
             <p className="truncate font-mono text-xs text-gris">
               {c.email}
-              {!c.userId ? ` · ${t.comun.pendiente}` : !c.activo ? ` · ${t.comun.inactivo}` : ""}
+              {!c.userId ? <> · {t.comun.pendiente} · <VigenciaInvitacion vence={c.invitacionVence} /></> : !c.activo ? ` · ${t.comun.inactivo}` : ""}
             </p>
             <p className="flex flex-wrap items-center gap-x-5">
-              {!c.userId && c.codigo && (
-                <button
-                  className="enlace py-1 font-medium"
-                  onClick={async () => (await copiarInvitacion(c.codigo!, t.equipo.enlace)) && setCopiado(c.codigo!)}
-                >
-                  {copiado === c.codigo ? t.equipo.copiado : t.equipo.enlace}
-                </button>
-              )}
+              {!c.userId && <AccionesInvitacion perfil={c} copiado={copiado} onCopiar={copiar} onRenovar={renovar} />}
               {porQuitar === c.id ? (
                 <span>
                   {t.obras.quitarClienteSeguro}

@@ -35,6 +35,10 @@ export type Base = {
 
 const ahoraIso = () => new Date().toISOString();
 
+/** Cuánto dura una invitación en la muestra, igual que en la base de datos. */
+const DIAS_INVITACION = 7;
+const venceEn = (dias: number) => new Date(Date.now() + dias * 86_400_000).toISOString();
+
 function administrador(b: Base) {
   const p = b.perfiles.find((x) => x.id === b.yo && x.activo);
   if (!p || p.rol !== "admin") throw new ErrorFlujo("permiso");
@@ -235,9 +239,14 @@ export function invitarCliente(b: Base, obraId: string, nombre: string, email: s
       rol: "cliente",
       activo: true,
       codigo: `DEMO${String(b.sec).padStart(6, "0")}`,
+      invitacionVence: venceEn(DIAS_INVITACION),
       creado: ahoraIso(),
     };
     b.perfiles.push(perfil);
+  } else if (!perfil.userId && (!perfil.invitacionVence || new Date(perfil.invitacionVence) <= new Date())) {
+    // Todavía no activó su cuenta y su código venció: se le da uno nuevo para que el enlace sirva.
+    perfil.codigo = `DEMO${String(++b.sec).padStart(6, "0")}`;
+    perfil.invitacionVence = venceEn(DIAS_INVITACION);
   }
   if (!b.clientes.some((c) => c.obraId === obraId && c.perfilId === perfil.id)) {
     b.clientes.push({ obraId, perfilId: perfil.id });
@@ -294,9 +303,21 @@ export function invitar(b: Base, nombre: string, email: string, rol: Rol) {
     rol,
     activo: true,
     codigo,
+    invitacionVence: venceEn(DIAS_INVITACION),
     creado: ahoraIso(),
   });
   return codigo;
+}
+
+/** Renueva una invitación pendiente: código nuevo y otros siete días. Devuelve el código. */
+export function renovarInvitacion(b: Base, id: string) {
+  administrador(b);
+  const perfil = b.perfiles.find((p) => p.id === id);
+  if (!perfil) throw new ErrorFlujo("no_existe");
+  if (perfil.userId) throw new ErrorFlujo("ya_activa");
+  perfil.codigo = `DEMO${String(++b.sec).padStart(6, "0")}`;
+  perfil.invitacionVence = venceEn(DIAS_INVITACION);
+  return perfil.codigo;
 }
 
 export function actualizarPerfil(b: Base, id: string, nombre: string, rol: Rol, activo: boolean) {
@@ -586,6 +607,8 @@ export function semilla(idioma: "es" | "en", hoy: string): Base {
     rol,
     activo: true,
     codigo: activa ? null : `DEMO${id.toUpperCase()}INVITA`,
+    // Las invitaciones de ejemplo llevan cuatro días enviadas: les quedan tres.
+    invitacionVence: activa ? null : venceEn(DIAS_INVITACION - 4),
     creado: `${sumarDias(hoy, -30)}T14:00:00.000Z`,
   });
   const b: Base = {

@@ -82,7 +82,7 @@ En la página de entrada, «Probar sin cuenta» abre una muestra con un equipo f
 
 1. Crea un proyecto en Supabase y ejecuta `supabase/schema.sql` completo en el SQL Editor.
    Si la base ya tenía una versión anterior, basta con ejecutar en orden las migraciones que
-   falten de `supabase/migrations/` (001 obras y archivos, 002 clientes, 003 archivar tareas).
+   falten de `supabase/migrations/` (001 obras y archivos, 002 clientes, 003 archivar tareas, 004 invitaciones que caducan).
 2. En Supabase → Authentication → Users, crea el usuario del administrador (correo y contraseña).
 3. En Authentication → URL Configuration, pon la dirección definitiva del sitio como *Site URL*.
    Los enlaces de confirmación de correo y de cambio de contraseña llevan a esa dirección.

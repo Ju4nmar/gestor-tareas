@@ -76,6 +76,17 @@ export function diasRestantes(tarea: Pick<Tarea, "vence">, hoy: string) {
   return Math.round((dia(tarea.vence) - dia(hoy)) / 86_400_000);
 }
 
+/**
+ * Días que le quedan a una invitación pendiente: 0 es "vence hoy" y un número negativo,
+ * que ya venció. Nulo si no hay fecha o si todavía no se sabe qué día es hoy.
+ */
+export function diasInvitacion(vence: string | null, hoy: string) {
+  if (!vence || !hoy) return null;
+  const fecha = new Date(vence);
+  const [y, m, d] = hoy.split("-").map(Number);
+  return Math.round((Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()) - Date.UTC(y, m - 1, d)) / 86_400_000);
+}
+
 export const abierta = (tarea: Tarea) => tarea.estado !== "completada";
 
 /** Vencida: pasó su fecha límite y aún no está completada. */

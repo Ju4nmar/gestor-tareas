@@ -16,8 +16,8 @@ Se lee al empezar y se actualiza al terminar cada tarea.
 
 | # | Tarea | Rama | Estado |
 |---|-------|------|--------|
-| 1 | Archivar tareas en vez de borrarlas (+ limpieza de fotos al borrar) | `fix/archivar-tareas` | En revisión |
-| 2 | Invitaciones que caducan | `fix/invitaciones-caducan` | Pendiente |
+| 1 | Archivar tareas en vez de borrarlas (+ limpieza de fotos al borrar) | `fix/archivar-tareas` | Hecha |
+| 2 | Invitaciones que caducan | `fix/invitaciones-caducan` | En revisión |
 | 3 | Pruebas de las transiciones del flujo (TypeScript y SQL) | `test/transiciones-flujo` | Pendiente |
 
 ### Tarea 1 · Archivar tareas
