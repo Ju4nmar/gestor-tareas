@@ -10,52 +10,128 @@
 :root {
   --papel: #f2eee5;
   --hoja: #faf8f2;
+  --hoja-hover: #f5f1e8;
   --tinta: #16130e;
+  --tinta-suave: #3a362f;
   --gris: #6a655b;
   --regla: rgb(22 19 14 / 0.16);
+  --regla-fuerte: rgb(22 19 14 / 0.32);
   --marca: #d9f24b;
   --alerta: #cf3516;
+  --alerta-fondo: #fdf2ef;
+  --exito: #1f7a36;
+  --info: #1d5cb8;
   color-scheme: light;
 
+  /* Estados del flujo: punto sólido, fondo suave y borde de contorno */
   --e-borrador: #8c877c;
+  --e-borrador-fondo: #ece8de;
+  --e-borrador-borde: rgba(140, 135, 124, 0.3);
+
   --e-asignada: #2b59c3;
+  --e-asignada-fondo: #edf3fc;
+  --e-asignada-borde: rgba(43, 89, 195, 0.3);
+
   --e-aclaracion: #a23e8c;
+  --e-aclaracion-fondo: #fcf1fa;
+  --e-aclaracion-borde: rgba(162, 62, 140, 0.3);
+
   --e-aceptada: #0f8b8d;
+  --e-aceptada-fondo: #eef9f9;
+  --e-aceptada-borde: rgba(15, 139, 141, 0.3);
+
   --e-en_curso: #c98200;
+  --e-en_curso-fondo: #fff7eb;
+  --e-en_curso-borde: rgba(201, 130, 0, 0.3);
+
   --e-enviada: #5b4bc4;
+  --e-enviada-fondo: #f3f1fc;
+  --e-enviada-borde: rgba(91, 75, 196, 0.3);
+
   --e-en_revision: #dd641c;
+  --e-en_revision-fondo: #fef4ee;
+  --e-en_revision-borde: rgba(221, 100, 28, 0.3);
+
   --e-devuelta: #cf3516;
+  --e-devuelta-fondo: #fdf2ef;
+  --e-devuelta-borde: rgba(207, 53, 22, 0.3);
+
   --e-completada: #2e8b3d;
+  --e-completada-fondo: #eef8f1;
+  --e-completada-borde: rgba(46, 139, 61, 0.3);
+
+  /* Ergonomía y dimensiones táctiles */
+  --touch-target-min: 44px;
+  --touch-target-field: 48px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
 }
 
 [data-theme="dark"] {
   --papel: #12110e;
   --hoja: #1b1915;
+  --hoja-hover: #24221d;
   --tinta: #efeadf;
+  --tinta-suave: #cfc8ba;
   --gris: #a09a8d;
   --regla: rgb(239 234 223 / 0.17);
+  --regla-fuerte: rgb(239 234 223 / 0.3);
   --alerta: #ff6f4f;
+  --alerta-fondo: #2e1713;
+  --exito: #45b360;
+  --info: #639bf0;
   color-scheme: dark;
 
   --e-borrador: #9f998c;
+  --e-borrador-fondo: #23211c;
+  --e-borrador-borde: rgba(159, 153, 140, 0.35);
+
   --e-asignada: #7a9cf0;
+  --e-asignada-fondo: #17243c;
+  --e-asignada-borde: rgba(122, 156, 240, 0.35);
+
   --e-aclaracion: #d987c6;
+  --e-aclaracion-fondo: #311c2d;
+  --e-aclaracion-borde: rgba(217, 135, 198, 0.35);
+
   --e-aceptada: #4cc4c6;
+  --e-aceptada-fondo: #15292a;
+  --e-aceptada-borde: rgba(76, 196, 198, 0.35);
+
   --e-en_curso: #f0b33c;
+  --e-en_curso-fondo: #31240c;
+  --e-en_curso-borde: rgba(240, 179, 60, 0.35);
+
   --e-enviada: #a195f5;
+  --e-enviada-fondo: #231f3c;
+  --e-enviada-borde: rgba(161, 149, 245, 0.35);
+
   --e-en_revision: #f59553;
+  --e-en_revision-fondo: #321f12;
+  --e-en_revision-borde: rgba(245, 149, 83, 0.35);
+
   --e-devuelta: #ff6f4f;
+  --e-devuelta-fondo: #2e1713;
+  --e-devuelta-borde: rgba(255, 111, 79, 0.35);
+
   --e-completada: #6cc97b;
+  --e-completada-fondo: #162a1b;
+  --e-completada-borde: rgba(108, 201, 123, 0.35);
 }
 
 @theme inline {
   --color-papel: var(--papel);
   --color-hoja: var(--hoja);
+  --color-hoja-hover: var(--hoja-hover);
   --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
   --color-gris: var(--gris);
   --color-regla: var(--regla);
+  --color-regla-fuerte: var(--regla-fuerte);
   --color-marca: var(--marca);
   --color-alerta: var(--alerta);
+  --color-alerta-fondo: var(--alerta-fondo);
+  --color-exito: var(--exito);
   --font-sans: var(--font-plex), system-ui, sans-serif;
   --font-display: var(--font-bricolage), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;

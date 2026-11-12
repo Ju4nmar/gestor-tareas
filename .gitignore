@@ -42,3 +42,8 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# agents and skills
+.agents/
+.claude/
+skills-lock.json

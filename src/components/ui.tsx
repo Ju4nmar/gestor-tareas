@@ -36,14 +36,34 @@ export function Logo({ className = "text-2xl" }: { className?: string }) {
   );
 }
 
-/** Estado de una tarea: un cuadro de su color y el nombre. */
-export function Sello({ estado, className = "" }: { estado: Estado; className?: string }) {
+/** Estado de una tarea: un cuadro de su color y el nombre, con variante simple o badge. */
+export function Sello({
+  estado,
+  variante = "simple",
+  className = "",
+}: {
+  estado: Estado;
+  variante?: "simple" | "badge";
+  className?: string;
+}) {
   const { t } = useT();
+  const esBadge = variante === "badge";
   return (
     <span
-      className={`inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.07em] whitespace-nowrap ${className}`}
+      className={`inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.07em] whitespace-nowrap ${
+        esBadge ? "rounded-[3px] border px-2 py-0.5" : ""
+      } ${className}`}
+      style={
+        esBadge
+          ? {
+              backgroundColor: `var(--e-${estado}-fondo)`,
+              borderColor: `var(--e-${estado}-borde)`,
+              color: `var(--tinta)`,
+            }
+          : undefined
+      }
     >
-      <span aria-hidden className="h-2 w-2 shrink-0" style={{ background: `var(--e-${estado})` }} />
+      <span aria-hidden className="h-2 w-2 shrink-0 rounded-[1px]" style={{ background: `var(--e-${estado})` }} />
       {t.estados[estado]}
     </span>
   );
