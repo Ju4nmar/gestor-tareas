@@ -17,8 +17,8 @@ Se lee al empezar y se actualiza al terminar cada tarea.
 | # | Tarea | Rama | Estado |
 |---|-------|------|--------|
 | 1 | Archivar tareas en vez de borrarlas (+ limpieza de fotos al borrar) | `fix/archivar-tareas` | Hecha |
-| 2 | Invitaciones que caducan | `fix/invitaciones-caducan` | En revisión |
-| 3 | Pruebas de las transiciones del flujo (TypeScript y SQL) | `test/transiciones-flujo` | Pendiente |
+| 2 | Invitaciones que caducan | `fix/invitaciones-caducan` | Hecha |
+| 3 | Pruebas de las transiciones del flujo (TypeScript y SQL) | `test/transiciones-flujo` | Hecha |
 
 ### Tarea 1 · Archivar tareas
 
@@ -28,6 +28,19 @@ cliente, disparadores que congelan la tarea archivada), cambios en `store.ts`, `
 
 Por verificar a mano en el Supabase de pruebas (ver pasos en la conversación): archivar, restaurar,
 borrar definitivamente con fotos, y que un empleado y un cliente no vean las archivadas.
+
+### Tarea 2 · Invitaciones que caducan
+
+Hecho: migración `004_invitaciones_caducan.sql` (columna `invite_expires_at`, funciones `tm_invite_info`,
+`tm_activate`, `tm_invite`, `tm_invite_client`, `tm_renew_invite`), vigencia en `store.ts`, `demo.ts`,
+componentes `VigenciaInvitacion` y `AccionesInvitacion`, pantallas de equipo y obras, y pantalla `/activar`.
+Probado con prueba E2E de navegador.
+
+### Tarea 3 · Pruebas de las transiciones del flujo (TypeScript y SQL)
+
+Hecho: suite de pruebas automatizadas en `test/flujo-transiciones.test.ts` con runner `test/run.mjs`
+y comando `npm test`. Cubre las 450 combinaciones de transiciones de estado, permisos por rol,
+validación de notas, tareas archivadas y paridad estricta entre `flujo.ts` y la función SQL `tm_act`.
 
 ## Después de estas tres
 
