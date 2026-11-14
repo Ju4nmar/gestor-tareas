@@ -30,7 +30,7 @@ export default function HistorialPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-regla pb-2">
         <div className="flex gap-2">
           {(["actividad", "completadas"] as const).map((v) => (
-            <button key={v} className={`pestana ${vista === v ? "pestana-activa" : ""}`} onClick={() => setVista(v)}>
+            <button key={v} aria-pressed={vista === v} className={`pestana ${vista === v ? "pestana-activa" : ""}`} onClick={() => setVista(v)}>
               {t.historial[v]}
               {v === "completadas" && (
                 <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-gris dark:bg-slate-800">
@@ -70,7 +70,7 @@ export default function HistorialPage() {
       ) : actividad.length === 0 ? (
         <div className="hoja p-12 text-center text-sm text-gris">{t.historial.vacio}</div>
       ) : (
-        <ol className="divide-y divide-regla rounded-2xl border border-regla bg-hoja shadow-xs overflow-hidden">
+        <ol className="historial-timeline divide-y divide-regla rounded-2xl border border-regla bg-hoja shadow-xs overflow-hidden">
           {actividad.map((e) => {
             const tarea = porId.get(e.tareaId);
             return (

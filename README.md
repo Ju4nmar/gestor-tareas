@@ -1,4 +1,4 @@
-# Relevo · Gestión de tareas
+# TRAZO · Gestión de Obras y Tareas
 
 Aplicación para repartir tareas entre un administrador y su equipo, agrupadas por obra
 (un local, una casa, un apartamento). El administrador crea y asigna; cada persona acepta,
@@ -43,11 +43,12 @@ Las reglas están en `src/lib/flujo.ts` y, las que mandan, en la función `tm_ac
 
 - **Next.js (React) + TypeScript + Tailwind CSS**, con **Supabase** (Postgres y autenticación).
 - **Permisos en la base de datos, no en el navegador.** Cada tabla tiene seguridad por fila:
-  una persona solo puede leer su perfil, sus tareas y el historial de esas tareas; el administrador lee todo.
+  cada empresa tiene sus propios datos y membresías. Una persona ve sus tareas y el administrador ve su empresa.
 - **Nadie escribe directo en las tablas.** Crear, editar y cada paso del flujo pasan por funciones de la
   base que comprueban quién llama, validan los datos y anotan el paso en el historial. Aunque alguien
   manipule la aplicación, no puede aprobar su propia tarea ni saltarse un estado.
-- **Usuarios por invitación.** El administrador crea la invitación y comparte un enlace de un solo uso;
+- **Registro de cuentas y empresas.** Cada cuenta confirma su correo y crea su empresa como administrador.
+  El administrador crea la invitación y comparte un enlace de un solo uso;
   la persona elige su contraseña. El administrador nunca la conoce.
 - **El cliente no lee las tablas.** Una función de la base le arma el resumen de su obra campo por
   campo, así que lo interno no viaja a su navegador aunque abra las herramientas del desarrollador.
@@ -59,7 +60,7 @@ Las reglas están en `src/lib/flujo.ts` y, las que mandan, en la función `tm_ac
 - **Sin claves secretas en la aplicación.** Solo se usa la clave publicable de Supabase.
 - **Cabeceras de seguridad** en `next.config.ts` (no se puede incrustar en otros sitios, entre otras).
 - **Pensada para crecer.** Los estados y reglas viven en un solo lugar; los textos, en `src/lib/textos.ts`
-  (español e inglés); añadir un campo o un paso no obliga a tocar las pantallas una por una.
+  (interfaz en español); añadir un campo o un paso no obliga a tocar las pantallas una por una.
 
 ## Probarla
 
@@ -75,21 +76,53 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
 
-En la página de entrada, «Probar sin cuenta» abre una muestra con un equipo ficticio (también con
+En la página de entrada, «Explorar demo» abre una muestra con un equipo ficticio (también con
 `/?demo=admin`, `/?demo=empleado` o `/?demo=cliente`). La muestra vive en la pestaña y no toca la base de datos.
 
-## Instalarla para un cliente
+## Proyecto dedicado y registro de empresas
 
-1. Crea un proyecto en Supabase y ejecuta `supabase/schema.sql` completo en el SQL Editor.
-   Si la base ya tenía una versión anterior, basta con ejecutar en orden las migraciones que
-   falten de `supabase/migrations/` (001 obras y archivos, 002 clientes, 003 archivar tareas, 004 invitaciones que caducan).
-2. En Supabase → Authentication → Users, crea el usuario del administrador (correo y contraseña).
-3. En Authentication → URL Configuration, pon la dirección definitiva del sitio como *Site URL*.
-   Los enlaces de confirmación de correo y de cambio de contraseña llevan a esa dirección.
-4. Publica en Vercel con las dos variables de arriba.
-5. Entra con ese usuario: el primero que entra queda como administrador.
-6. En Equipo, invita a cada persona y envíale su enlace.
+El proyecto de TRAZO es `dcwmzdsefflgodwyhadp`. La conexión local está en `.env.local`, que Git ignora.
+Para una instalación limpia, ejecutar `supabase/schema.sql` completo una sola vez. Las migraciones
+multiempresa requieren una base limpia o ya multiempresa. Una instalación anterior con perfiles requiere
+una migración de datos específica antes de aplicar estos cambios.
 
-**Correos:** con la configuración por defecto, Supabase pide confirmar el correo al crear la cuenta y
-envía pocos mensajes por hora. Para un equipo real, configura un servidor de correo propio (SMTP) en
-Authentication → Emails, o desactiva la confirmación si las invitaciones se entregan en persona.
+1. En Supabase, Authentication > URL Configuration, usar `http://localhost:3000` como Site URL
+   durante el desarrollo. Añadir `http://localhost:3000/**` a Redirect URLs para confirmaciones,
+   invitaciones y recuperación de contraseña. Para publicar, configurar también las direcciones reales.
+2. Mantener habilitados los registros por correo y la confirmación del correo.
+3. Abrir `/registro`, crear una cuenta personal y confirmar el correo.
+4. En `/empresas`, registrar la empresa. Su creador recibe el rol de administrador en ella.
+5. Invitar personas desde Equipo o clientes desde Obras. Una cuenta existente puede aceptar
+   invitaciones de otras empresas. Cada membresía conserva su propio rol.
+6. Usar Cambiar empresa para elegir el contexto o crear otra empresa.
+
+La cabecera `x-trazo-company` selecciona la empresa en las consultas. Postgres comprueba la pertenencia
+con `auth.uid()` y aplica seguridad por fila en todas las tablas y funciones del flujo. Los enlaces
+entre tareas, obras, personas y archivos también llevan claves de empresa. Cambiar la cabecera por
+cuenta propia exige igualmente una membresía activa. El cambio de empresa espera las operaciones
+en curso, vacía los datos y enlaces temporales locales y descarta respuestas anteriores.
+
+Las funciones de alta y listado de empresas usan permisos elevados para crear la membresía inicial
+y listar exclusivamente las membresías propias. El asesor de seguridad de Supabase las señala como
+`authenticated_security_definer_function_executable`. Su exposición es intencional y sus comprobaciones
+se cubren en `supabase/tests/empresas.sql`.
+[Detalle del aviso de Supabase](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
+
+### Correos y verificación
+
+Para recibir confirmaciones con el correo de la cuenta principal de Supabase puede utilizarse su
+servicio inicial. Para que se registren otras empresas hace falta configurar un proveedor SMTP y un
+remitente válido en Authentication > Emails. El servicio inicial solo entrega a los miembros de la
+organización de Supabase y tiene un límite reducido de envíos.
+Referencia oficial https://supabase.com/docs/guides/auth/auth-smtp
+
+La integración de Supabase disponible permite instalar y probar el esquema. La configuración de SMTP
+y de URLs de Auth se realiza en el panel. La entrega de un correo real y la primera cuenta de la
+empresa deben verificarse con su propietario.
+
+### Pruebas
+
+Ejecutar `npm test`, `npx tsc --noEmit`, `npm run lint` y `npm run build`.
+En SQL Editor, ejecutar `supabase/tests/empresas.sql` como postgres. Comprueba aislamiento, roles por
+empresa, invitaciones de cuentas existentes, numeración independiente y permisos de archivos y
+limpieza. Todo se ejecuta en una transacción que termina con ROLLBACK.

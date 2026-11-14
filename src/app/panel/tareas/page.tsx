@@ -24,10 +24,12 @@ function Tareas({
   estadoInicial,
   obraInicial,
   avisoFotos,
+  nueva,
 }: {
   estadoInicial: Estado | "";
   obraInicial: string;
   avisoFotos: boolean;
+  nueva: boolean;
 }) {
   const { perfil, tareas, archivadas, perfiles, obras } = useStore();
   const { t } = useT();
@@ -42,7 +44,7 @@ function Tareas({
   const [prioridad, setPrioridad] = useState("");
   const [soloVencidas, setSoloVencidas] = useState(false);
   const [busqueda, setBusqueda] = useState("");
-  const [creando, setCreando] = useState(false);
+  const [creando, setCreando] = useState(Boolean(admin && nueva));
 
   const texto = sinTildes(busqueda.trim());
   const lista = tareas
@@ -156,11 +158,12 @@ function Tareas({
       )}
 
       {/* Barra de pestañas y filtros */}
-      <div className="space-y-4">
+      <div className="filtros-tareas space-y-4">
         <div className="flex gap-2 border-b border-regla pb-1">
           {(["abiertas", "completadas", "todas"] as Vista[]).map((v) => (
             <button
               key={v}
+              aria-pressed={vista === v}
               className={`pestana ${vista === v ? "pestana-activa" : ""}`}
               onClick={() => cambiarVista(v)}
             >
@@ -295,9 +298,12 @@ function Tareas({
 
 export default function TareasPage() {
   const params = useSearchParams();
+  const { perfil } = useStore();
   const estado = params.get("estado") ?? "";
   const obra = params.get("obra") ?? "";
   const avisoFotos = params.get("aviso") === "fotos";
   const valido = (ESTADOS as string[]).includes(estado) ? (estado as Estado) : "";
-  return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} avisoFotos={avisoFotos} />;
+  const nueva = params.get("nueva") === "1";
+  if (!perfil) return null;
+  return <Tareas key={`${valido}-${obra}-${nueva}`} estadoInicial={valido} obraInicial={obra} avisoFotos={avisoFotos} nueva={nueva} />;
 }

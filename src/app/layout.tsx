@@ -16,8 +16,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Relevo · Gestión de tareas",
-  description: "Asigna tareas a tu equipo, sigue su avance y revisa las entregas.",
+  title: "TRAZO · Gestión de Obras y Tareas",
+  description: "Del plano al progreso. Planifica, ejecuta y controla tus obras y tareas en un solo lugar.",
 };
 
 export const viewport: Viewport = {

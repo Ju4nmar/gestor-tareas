@@ -1,14 +1,12 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import type { Accion, Estado, Etapa, Fallo, Prioridad, Rol, Suceso } from "./types";
 
-// Todos los textos de la aplicación, en español e inglés. El idioma se elige con
-// el botón del menú y se recuerda en el navegador.
+// Textos y formatos de la interfaz en español.
 
 const es = {
-  marca: "Relevo",
-  lema: "Quién hace qué, y para cuándo.",
+  marca: "TRAZO",
+  lema: "Del plano al progreso.",
   roles: { admin: "Administrador", empleado: "Empleado", cliente: "Cliente" } as Record<Rol, string>,
   /** Cómo va una tarea a ojos del cliente. */
   etapas: { pendiente: "Pendiente", en_proceso: "En proceso", terminada: "Terminada" } as Record<Etapa, string>,
@@ -128,7 +126,6 @@ const es = {
     no: "No",
     ver: "Ver",
     tema: "Cambiar entre claro y oscuro",
-    idioma: "English",
     pendiente: "invitación pendiente",
     inactivo: "desactivado",
   },
@@ -141,8 +138,8 @@ const es = {
   },
   entrada: {
     puntos: ["El administrador crea y asigna.", "El equipo acepta, trabaja y entrega.", "Cada paso queda en el historial."],
-    titulo: "Entrar",
-    correo: "Correo",
+    titulo: "Iniciar sesión",
+    correo: "Correo electrónico",
     clave: "Contraseña",
     boton: "Entrar",
     entrando: "Entrando…",
@@ -151,9 +148,9 @@ const es = {
     olvidoListo: "Si ese correo tiene cuenta, ya va en camino el enlace.",
     invitado: "¿Te invitaron? Abre el enlace que te envió tu administrador.",
     demo: "Probar sin cuenta",
-    demoAdmin: "Entrar como administradora",
-    demoEmpleado: "Entrar como empleado",
-    demoCliente: "Entrar como cliente de una obra",
+    demoAdmin: "Administrador",
+    demoEmpleado: "Empleado",
+    demoCliente: "Cliente",
     demoNota: "Datos de ejemplo. Nada se guarda.",
     sinAcceso: (correo: string) =>
       `La cuenta ${correo} todavía no tiene acceso. Pide a tu administrador el enlace de invitación.`,
@@ -187,10 +184,10 @@ const es = {
   },
   inicio: {
     hola: (nombre: string) => `Hola, ${nombre}`,
-    flujo: "El flujo, ahora",
+    flujo: "Distribución de tareas",
     esperanPorTi: "Esperan por ti",
     nadaPendiente: "Nada espera por ti. Buen momento para adelantar.",
-    fechas: "Fechas",
+    fechas: "Próximos vencimientos",
     sinFechas: "Ninguna fecha límite cerca.",
     sinAsignar: "Sin asignar",
     enEspera: "Esperando respuesta",
@@ -333,7 +330,7 @@ const es = {
     titulo: "Equipo",
     invitar: "Invitar a alguien",
     nombre: "Nombre",
-    correo: "Correo",
+    correo: "Correo electrónico",
     rol: "Rol",
     boton: "Crear invitación",
     enlace: "Copiar enlace de invitación",
@@ -398,457 +395,28 @@ const es = {
     no_archivada: "Archiva la tarea antes de eliminarla.",
     archivo_tipo: "Solo se pueden subir fotos y archivos PDF.",
     archivo_grande: "El archivo pesa más de 15 MB.",
+    ocupado: "Espera a que termine la operación antes de cambiar de empresa.",
+    empresa_cambio: "Cambió la sesión o la empresa. Revisa el resultado antes de volver a intentarlo.",
     error: "Algo salió mal. Intenta de nuevo.",
   } as Record<Fallo, string>,
 };
 
-const en: typeof es = {
-  marca: "Relevo",
-  lema: "Who does what, and by when.",
-  roles: { admin: "Admin", empleado: "Team member", cliente: "Client" },
-  etapas: { pendiente: "Pending", en_proceso: "In progress", terminada: "Done" },
-  estados: {
-    borrador: "Unassigned",
-    asignada: "Assigned",
-    aclaracion: "Clarification asked",
-    aceptada: "Accepted",
-    en_curso: "In progress",
-    enviada: "Submitted",
-    en_revision: "In review",
-    devuelta: "Returned",
-    completada: "Completed",
-  },
-  vencida: "Overdue",
-  prioridades: { baja: "Low", media: "Medium", alta: "High", urgente: "Urgent" },
-  acciones: {
-    aceptar: { boton: "Accept task", ayuda: "You confirm you received it and will do it.", nota: "" },
-    aclarar: {
-      boton: "Ask for clarification",
-      ayuda: "The task goes back to the admin until they answer.",
-      nota: "What do you need clarified or changed?",
-    },
-    iniciar: { boton: "Start working", ayuda: "The task moves to “In progress”.", nota: "" },
-    enviar: {
-      boton: "Submit for review",
-      ayuda: "The admin will review your work.",
-      nota: "Submission note (optional): what you did, where it is, what is missing.",
-    },
-    responder: {
-      boton: "Answer clarification",
-      ayuda: "Edit the task first if needed. It goes back to “Assigned” to be accepted again.",
-      nota: "Your answer",
-    },
-    revisar: { boton: "Start review", ayuda: "Lets the team know you are reviewing it.", nota: "" },
-    aprobar: { boton: "Approve", ayuda: "The task is marked as completed.", nota: "Comment (optional)" },
-    devolver: {
-      boton: "Return with changes",
-      ayuda: "The task goes back to its owner to be fixed.",
-      nota: "What needs to change?",
-    },
-    reabrir: { boton: "Reopen", ayuda: "The task goes back to its owner as “Returned”.", nota: "Why is it being reopened?" },
-    comentar: { boton: "Comment", ayuda: "", nota: "Write a comment" },
-  },
-  sucesos: {
-    crear: () => "created the task",
-    asignar: (n) => `assigned it to ${n}`,
-    reasignar: (n) => `reassigned it to ${n}`,
-    desasignar: () => "left it unassigned",
-    editar: (n) => `edited ${n}`,
-    aceptar: () => "accepted the task",
-    aclarar: () => "asked for clarification",
-    iniciar: () => "started working",
-    enviar: () => "submitted the task for review",
-    responder: () => "answered the clarification",
-    revisar: () => "started the review",
-    aprobar: () => "approved the task",
-    devolver: () => "returned the task with changes",
-    reabrir: () => "reopened the task",
-    comentar: () => "commented",
-    adjuntar: (n) => `attached “${n}”`,
-    archivar: () => "archived the task",
-    restaurar: () => "restored the task",
-  },
-  campos: {
-    titulo: "Title",
-    descripcion: "Description and instructions",
-    prioridad: "Priority",
-    vence: "Due date",
-    responsable: "Owner",
-    estado: "Status",
-    creada: "Created",
-    actualizada: "Last activity",
-    codigo: "Code",
-    tarea: "Task",
-    obra: "Project",
-  },
-  camposEditados: {
-    titulo: "the title",
-    descripcion: "the description",
-    prioridad: "the priority",
-    vence: "the due date",
-    obra: "the project",
-  },
-  nav: {
-    inicio: "Home",
-    tareas: "Tasks",
-    obras: "Projects",
-    historial: "History",
-    informes: "Reports",
-    equipo: "Team",
-    mas: "More",
-  },
-  comun: {
-    salir: "Sign out",
-    cancelar: "Cancel",
-    guardar: "Save",
-    cargando: "Loading…",
-    reintentar: "Retry",
-    errorCarga: "We could not load the data. Check your connection.",
-    sinFecha: "No date",
-    sinResponsable: "Unassigned",
-    sinObra: "No project",
-    todos: "All",
-    todas: "All",
-    si: "Yes",
-    no: "No",
-    ver: "View",
-    tema: "Switch between light and dark",
-    idioma: "Español",
-    pendiente: "invitation pending",
-    inactivo: "deactivated",
-  },
-  fechas: {
-    hoy: "due today",
-    manana: "due tomorrow",
-    en: (n) => `in ${n} days`,
-    ayer: "due yesterday",
-    hace: (n) => `${n} days overdue`,
-  },
-  entrada: {
-    puntos: ["The admin creates and assigns.", "The team accepts, works and delivers.", "Every step stays in the history."],
-    titulo: "Sign in",
-    correo: "Email",
-    clave: "Password",
-    boton: "Sign in",
-    entrando: "Signing in…",
-    olvido: "Forgot your password?",
-    olvidoAyuda: "Type your email above and we will send you a link to create a new one.",
-    olvidoListo: "If that email has an account, the link is on its way.",
-    invitado: "Were you invited? Open the link your admin sent you.",
-    demo: "Try it without an account",
-    demoAdmin: "Enter as the admin",
-    demoEmpleado: "Enter as a team member",
-    demoCliente: "Enter as a project client",
-    demoNota: "Sample data. Nothing is saved.",
-    sinAcceso: (correo) => `The account ${correo} has no access yet. Ask your admin for the invitation link.`,
-    desactivada: "Your account is deactivated. Talk to your admin.",
-  },
-  activar: {
-    titulo: "Activate your account",
-    hola: (nombre) => `Hi, ${nombre}. Create your password to get in.`,
-    invalida: "This invitation link is not valid or was already used.",
-    vencida: "This invitation has expired. Ask whoever invited you to send you a new one.",
-    clave: "Create a password",
-    claveAyuda: "At least 8 characters.",
-    repetir: "Repeat it",
-    distintas: "The passwords do not match.",
-    boton: "Activate account",
-    activando: "Activating…",
-    confirmar: (correo) =>
-      `We sent an email to ${correo}. Confirm it and open this link again: the same password gets you in.`,
-    irEntrar: "Go to sign in",
-  },
-  restablecer: {
-    titulo: "New password",
-    boton: "Save password",
-    listo: "Password updated.",
-    sinSesion: "Open this page from the link in your email.",
-  },
-  demo: { aviso: "Sample mode · changes are not saved", verComo: "View as", salir: "Leave the sample" },
-  inicio: {
-    hola: (nombre) => `Hi, ${nombre}`,
-    flujo: "The flow, right now",
-    esperanPorTi: "Waiting on you",
-    nadaPendiente: "Nothing is waiting on you. A good time to get ahead.",
-    fechas: "Dates",
-    sinFechas: "No due dates coming up.",
-    sinAsignar: "Unassigned",
-    enEspera: "Waiting for an answer",
-    cifras: { abiertas: "Open", vencidas: "Overdue", porRevisar: "To review", completadas: "Completed in 30 days" },
-    tuTurno: "Your turn",
-    porAceptar: "To accept",
-    enMarcha: "Under way",
-    devueltas: "Returned with changes",
-    verTodas: "See all tasks",
-    obras: "Active projects",
-  },
-  tareas: {
-    titulo: "Tasks",
-    nueva: "New task",
-    buscar: "Search by title or code",
-    vistas: { abiertas: "Open", completadas: "Completed", todas: "All" },
-    soloVencidas: "Overdue only",
-    vacio: "No tasks match those filters.",
-    cuenta: (n) => (n === 1 ? "1 task" : `${n} tasks`),
-    archivadas: "Archived",
-    archivadasAyuda: "Only you can see them. They keep their history and photos until you delete them.",
-    avisoFotos:
-      "The task was deleted, but some of its photos could not be removed from storage. They are no longer shown in the app.",
-  },
-  formulario: {
-    nueva: "New task",
-    editar: "Edit task",
-    borrador: "Unassigned (saved as a draft)",
-    crear: "Create task",
-    guardar: "Save changes",
-    tituloCorto: "The title needs at least 3 letters.",
-    reasignar: "Changing the owner sends the task back to “Assigned” so the new person can accept it.",
-  },
-  detalle: {
-    volver: "Tasks",
-    noExiste: "This task does not exist or you have no access to it.",
-    siguiente: "Next step",
-    esperaAdmin: "Waiting on the admin.",
-    esperaA: (nombre) => `Waiting on ${nombre}.`,
-    sinResponsable: "Assign an owner to get this task moving.",
-    terminada: "Task completed.",
-    otras: "Other actions",
-    confirmar: "Confirm",
-    historial: "History",
-    editar: "Edit",
-    eliminar: "Delete permanently",
-    eliminarSeguro: "Delete this task, its history and its photos? This can’t be undone.",
-    eliminarSi: "Yes, delete",
-    archivar: "Archive",
-    restaurar: "Restore",
-    archivadaAviso:
-      "This task is archived: the team and the client no longer see it and it can’t be changed. Restore it to keep working, or delete it if you no longer need it.",
-    sinDescripcion: "No description.",
-    notaCorta: "Write at least 3 letters.",
-    hecho: (estado) => `Done. The task is now: ${estado}.`,
-  },
-  archivos: {
-    titulo: "Photos and files",
-    tomarFoto: "Take a photo",
-    subir: "Upload a photo or file",
-    agregar: "Add photos or plans",
-    subiendo: "Uploading…",
-    vacio: "No photos or files yet.",
-    ayuda: "Photos or PDF, up to 15 MB each.",
-    elegidos: (n) => (n === 1 ? "1 file ready to upload" : `${n} files ready to upload`),
-    de: (autor) => `Uploaded by ${autor}`,
-    quitar: "Remove",
-    quitarSeguro: "Remove this file?",
-    abrir: "Open",
-    cerrar: "Close",
-    sinVista: "PDFs are not stored in the sample.",
-    conNota: "Progress photos (optional)",
-    alCrear: "Plans or photos to explain the task (optional)",
-  },
-  obras: {
-    titulo: "Projects",
-    ayuda: "A project is a job: a shop, a house, an apartment. Every task belongs to a project.",
-    nueva: "New project",
-    nombre: "Project name",
-    detalle: "Address or note",
-    crear: "Create project",
-    archivar: "Archive",
-    reactivar: "Reactivate",
-    archivada: "Archived",
-    borrar: "Delete",
-    verTareas: "See tasks",
-    avance: (hechas, total) => `${hechas} of ${total} tasks completed`,
-    sinTareas: "No tasks yet",
-    vacio: "No projects yet. Create the first one to start assigning tasks.",
-    todas: "All projects",
-    tuyas: "The projects where you have tasks.",
-    sinTuyas: "You have no tasks in any project yet.",
-    abiertas: (n) => (n === 1 ? "1 open" : `${n} open`),
-    vencidas: (n) => (n === 1 ? "1 overdue" : `${n} overdue`),
-    borrarSeguro: "Delete this project?",
-    archivadas: "Archived projects",
-    elegir: "Choose the project",
-    avanceCorto: "Overall progress",
-    clientes: "Client",
-    sinCliente: "Nobody is invited to follow this project.",
-    invitarCliente: "Invite the client",
-    clienteOpcional: "Project client (optional)",
-    clienteAyuda:
-      "The client signs in with their own account and sees the progress, the tasks (pending, in progress or done) and the photos of this project. They see no comments or instructions, and cannot change anything.",
-    clienteNombre: "Client name",
-    clienteCorreo: "Client email",
-    quitarCliente: "Remove",
-    quitarClienteSeguro: "Remove their access to this project?",
-    enlaceListo: "Invitation created. Copy the link and send it by WhatsApp or email: it works only once.",
-  },
-  historial: {
-    titulo: "History",
-    actividad: "Activity",
-    completadas: "Completed",
-    vacio: "No activity yet.",
-    sinCompletadas: "No completed tasks yet.",
-    persona: "Person",
-    completadaEl: "Completed on",
-  },
-  informes: {
-    titulo: "Reports",
-    periodo: "Period",
-    periodos: { "7": "Last 7 days", "30": "Last 30 days", "90": "Last 90 days", todo: "All time" },
-    creadas: "Created",
-    completadas: "Completed",
-    aTiempo: "Delivered on time",
-    promedio: "Average days to complete",
-    vencidas: "Overdue now",
-    devoluciones: "Returns",
-    porPersona: "By person",
-    porEstado: "By status",
-    porPrioridad: "By priority (open)",
-    porObra: "By project",
-    abiertas: "Open",
-    descargar: "Download CSV",
-    sinDatos: "No data in this period.",
-    nota: "“On time” compares the approval day with the due date; tasks without a date do not count.",
-  },
-  equipo: {
-    titulo: "Team",
-    invitar: "Invite someone",
-    nombre: "Name",
-    correo: "Email",
-    rol: "Role",
-    boton: "Create invitation",
-    enlace: "Copy invitation link",
-    copiado: "Link copied",
-    invitacionVence: (n: number) => n === 0 ? "expires today" : n === 1 ? "expires tomorrow" : "expires in " + n + " days",
-    invitacionVencida: "expired",
-    renovar: "Renew",
-    ayuda: "Each person creates their own password with the link. Send it privately: it works only once.",
-    activo: "Active",
-    desactivar: "Deactivate access",
-    reactivar: "Reactivate",
-    retirar: "Withdraw invitation",
-    tu: "you",
-    abiertas: (n) => (n === 1 ? "1 open task" : `${n} open tasks`),
-    guardar: "Save",
-    clientes: "Clients",
-    clientesAyuda: "They are invited from each project, on the Projects page.",
-    sigue: (obras) => `Follows: ${obras}`,
-    sinObra: "no project",
-  },
-  cliente: {
-    tusObras: "Your projects",
-    avance: (hechas, total) => `${hechas} of ${total} tasks done`,
-    fotos: "Progress photos",
-    sinFotos: "No photos yet. They will show up here as the work moves forward.",
-    tareas: "Tasks",
-    sinTareas: "No tasks scheduled in this project yet.",
-    para: (fecha) => `Due ${fecha}`,
-    terminadaEl: (fecha) => `Done on ${fecha}`,
-    sinObras: "You have no project assigned yet. Contact whoever invited you.",
-    privado: "Only you and the project team can see this page.",
-    terminadaObra: "Project finished",
-  },
-  fallos: {
-    permiso: "You are not allowed to do that.",
-    no_existe: "It no longer exists. Reload the page.",
-    transicion: "The task changed status in the meantime. Reload and check.",
-    nota: "The note is required (3 to 2,000 letters).",
-    titulo: "The title must have 3 to 140 letters.",
-    descripcion: "The description is too long.",
-    prioridad: "Choose a priority.",
-    asignado: "That person is no longer active.",
-    completada: "A completed task cannot change owner. Reopen it first.",
-    email: "That email does not look valid.",
-    nombre: "The name must have 2 to 80 letters.",
-    rol: "Choose a role.",
-    duplicado: "Someone on the team already has that email.",
-    propio: "You cannot remove your own admin role or deactivate yourself.",
-    ultimo_admin: "The team cannot be left without an admin.",
-    activa: "That person already activated their account: deactivate them instead.",
-    invitacion: "The invitation is not valid, was already used or belongs to another email.",
-    invitacion_vencida: "The invitation has expired. Ask whoever invited you to renew it.",
-    ya_activa: "Your account is already active. Sign in with your email and password.",
-    sesion: "Sign in to continue.",
-    credenciales: "Wrong email or password.",
-    confirmar: "Your email is not confirmed yet. Check your inbox.",
-    clave: "The password must have at least 8 characters.",
-    obra: "That project no longer exists.",
-    con_tareas: "This project has tasks: archive it instead of deleting it.",
-    archivo: "The file could not be uploaded. Check your connection and try again.",
-    archivada: "The task is archived: restore it to make changes.",
-    no_archivada: "Archive the task before deleting it.",
-    archivo_tipo: "Only photos and PDF files can be uploaded.",
-    archivo_grande: "The file is larger than 15 MB.",
-    error: "Something went wrong. Please try again.",
-  },
-};
-
+// El tipo permite leer muestras de versiones anteriores.
 export type Idioma = "es" | "en";
 export type Textos = typeof es;
-const diccionario: Record<Idioma, Textos> = { es, en };
-const regiones: Record<Idioma, string> = { es: "es-CO", en: "en-US" };
+export const idiomaActual = (): Idioma => "es";
 
-// --- Idioma elegido ---------------------------------------------------------
-
-const CLAVE = "relevo-idioma";
-const oyentes = new Set<() => void>();
-let idioma: Idioma | null = null;
-
-function leer(): Idioma {
-  if (idioma) return idioma;
-  let guardado: string | null = null;
-  try {
-    guardado = window.localStorage.getItem(CLAVE);
-  } catch {
-    // Sin almacenamiento se usa el idioma del navegador.
-  }
-  idioma = guardado === "es" || guardado === "en" ? guardado : navigator.language.startsWith("en") ? "en" : "es";
-  document.documentElement.lang = idioma;
-  return idioma;
-}
-
-export function cambiarIdioma(nuevo: Idioma) {
-  idioma = nuevo;
-  document.documentElement.lang = nuevo;
-  try {
-    window.localStorage.setItem(CLAVE, nuevo);
-  } catch {
-    // Sin almacenamiento el idioma dura hasta recargar.
-  }
-  oyentes.forEach((o) => o());
-}
-
-function subscribe(oyente: () => void) {
-  oyentes.add(oyente);
-  return () => {
-    oyentes.delete(oyente);
-  };
-}
-
-/** Idioma actual; "es" mientras se pinta en el servidor. */
-export const useIdioma = () => useSyncExternalStore<Idioma>(subscribe, leer, () => "es");
-
-/** Idioma en que se arma el contenido de muestra. */
-export const idiomaActual = () => leer();
-
-/** Textos y formatos de fecha en el idioma elegido. */
 export function useT() {
-  const actual = useIdioma();
-  const region = regiones[actual];
   const con = (opciones: Intl.DateTimeFormatOptions) => (valor: string) => {
-    // Una fecha suelta ("2026-10-15") se toma como día local, no como medianoche UTC.
     const fecha = valor.length === 10 ? new Date(`${valor}T12:00:00`) : new Date(valor);
-    return new Intl.DateTimeFormat(region, opciones).format(fecha);
+    return new Intl.DateTimeFormat("es-CO", opciones).format(fecha);
   };
   return {
-    t: diccionario[actual],
-    idioma: actual,
-    /** "15 oct" */
+    t: es,
+    idioma: "es" as const,
     dia: con({ day: "numeric", month: "short" }),
-    /** "15 oct 2026" */
     diaLargo: con({ day: "numeric", month: "short", year: "numeric" }),
-    /** "15 oct, 3:40 p. m." */
     momento: con({ day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }),
-    /** "lunes, 12 de octubre" */
     hoyLargo: con({ weekday: "long", day: "numeric", month: "long" }),
   };
 }

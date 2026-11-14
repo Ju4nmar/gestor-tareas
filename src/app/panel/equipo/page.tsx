@@ -164,7 +164,7 @@ export default function EquipoPage() {
                     <p className="mt-0.5 truncate text-xs text-gris">
                       {p.email} ·{" "}
                       {pendiente ? (
-                        <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                        <span className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300">
                           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                           {t.comun.pendiente} · <VigenciaInvitacion vence={p.invitacionVence} />
                         </span>
@@ -234,7 +234,7 @@ export default function EquipoPage() {
                     <p className="mt-0.5 truncate text-xs text-gris">
                       {p.email} ·{" "}
                       {!p.userId ? (
-                        <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                        <span className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300">
                           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                           {t.comun.pendiente} · <VigenciaInvitacion vence={p.invitacionVence} />
                         </span>

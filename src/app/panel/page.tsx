@@ -1,127 +1,227 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { Avance, Encabezado, Renglones, Seccion } from "@/components/ui";
-import { sumarDias, useHoy } from "@/lib/fechas";
-import { ESPERA_ADMIN, abierta, proxima, vencida } from "@/lib/flujo";
+import { Avance, Barras, Renglones, Seccion } from "@/components/ui";
+import { ObraVisual } from "@/components/Arquitectura";
+import { Icon } from "@/components/Icon";
+import { fechaLocal, sumarDias, useHoy } from "@/lib/fechas";
+import {
+  ESTADOS,
+  ESPERA_ADMIN,
+  abierta,
+  codigoTarea,
+  diasRestantes,
+  vencida,
+} from "@/lib/flujo";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
-import type { Estado, Obra, Tarea } from "@/lib/types";
+import type { Obra, Tarea } from "@/lib/types";
 
-/** Estados por los que pasa una tarea en marcha, para la franja del flujo. */
-const EN_MARCHA: Estado[] = ["asignada", "aclaracion", "aceptada", "en_curso", "enviada", "en_revision", "devuelta"];
-
-const porFecha = (a: Tarea, b: Tarea) => (a.vence ?? "9").localeCompare(b.vence ?? "9");
+const porFecha = (a: Tarea, b: Tarea) =>
+  (a.vence ?? "9").localeCompare(b.vence ?? "9");
 
 function TarjetaKPI({
   valor,
   etiqueta,
-  tono,
+  icono,
+  tono = "",
 }: {
   valor: number;
   etiqueta: string;
-  tono?: "alerta" | "marca" | "exito";
+  icono: "tareas" | "revisar" | "alerta" | "check";
+  tono?: string;
 }) {
-  const tonoClase =
-    tono === "alerta" && valor > 0
-      ? "text-rose-600 dark:text-rose-400 bg-rose-50/80 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/40"
-      : tono === "marca" && valor > 0
-        ? "text-blue-600 dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/40"
-        : "text-tinta bg-hoja border-regla";
-
   return (
-    <div className={`flex flex-col justify-between rounded-2xl border p-4 shadow-xs transition-shadow hover:shadow-md sm:p-5 ${tonoClase}`}>
-      <span className="text-xs font-semibold uppercase tracking-wider text-gris">{etiqueta}</span>
-      <span className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
-        {valor}
+    <div className={`kpi ${tono}`}>
+      <span className="kpi-icono">
+        <Icon name={icono} />
       </span>
+      <div>
+        <strong>{valor}</strong>
+        <p>{etiqueta}</p>
+      </div>
     </div>
   );
 }
 
-/** Cuántas tareas hay en cada estado, como una franja proporcional y sus cifras. */
 function Flujo({ tareas }: { tareas: Tarea[] }) {
   const { t } = useT();
-  const cuentas = EN_MARCHA.map((estado) => ({ estado, n: tareas.filter((x) => x.estado === estado).length }));
-  const total = cuentas.reduce((s, c) => s + c.n, 0);
+  const cuentas = ESTADOS.map((estado) => ({
+    estado,
+    n: tareas.filter((x) => x.estado === estado).length,
+  }));
+  const total = tareas.length;
+  let acumulado = 0;
+  const segmentos = cuentas
+    .filter((c) => c.n > 0)
+    .map((c) => {
+      const inicio = acumulado;
+      acumulado += (c.n / total) * 100;
+      return `var(--e-${c.estado}) ${inicio}% ${acumulado}%`;
+    });
 
   return (
-    <div className="hoja p-5 sm:p-6">
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden>
-        {cuentas.map(
-          (c) =>
-            c.n > 0 && (
-              <span
-                key={c.estado}
-                style={{ width: `${(c.n / total) * 100}%`, background: `var(--e-${c.estado})` }}
-                className="transition-all first:rounded-l-full last:rounded-r-full"
-              />
-            ),
-        )}
+    <div className="hoja flujo-contenido">
+      <div
+        className="flujo-dona"
+        style={{
+          background: total
+            ? `conic-gradient(${segmentos.join(",")})`
+            : "var(--regla)",
+        }}
+        aria-hidden="true"
+      >
+        <div className="flujo-total">
+          <strong>{total}</strong>
+          <span>Tareas</span>
+        </div>
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
+      <ul className="flujo-leyenda" aria-label="Cantidad de tareas por estado">
         {cuentas.map((c) => (
-          <Link
-            key={c.estado}
-            href={`/panel/tareas?estado=${c.estado}`}
-            className={`group rounded-xl border border-regla bg-papel/50 p-2.5 transition-all hover:border-slate-300 hover:shadow-xs dark:hover:border-slate-700 ${
-              c.n === 0 ? "opacity-50" : ""
-            }`}
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: `var(--e-${c.estado})` }} />
-              <span className="truncate text-[11px] font-semibold text-gris group-hover:text-tinta">
+          <li key={c.estado}>
+            <Link href={`/panel/tareas?estado=${c.estado}`}>
+              <span>
+                <i
+                  style={{ background: `var(--e-${c.estado})` }}
+                  aria-hidden="true"
+                />
                 {t.estados[c.estado]}
               </span>
-            </div>
-            <span className="mt-1 block font-display text-2xl font-bold text-tinta">{c.n}</span>
-          </Link>
+              <b>{c.n}</b>
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
 
-/** Cada obra activa con su avance; al tocarla se abren sus tareas. */
-function Obras({ obras, tareas, hoy }: { obras: Obra[]; tareas: Tarea[]; hoy: string }) {
+function Obras({
+  obras,
+  tareas,
+  hoy,
+}: {
+  obras: Obra[];
+  tareas: Tarea[];
+  hoy: string;
+}) {
   const { t } = useT();
   return (
-    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <ul className="dashboard-obras">
       {obras.map((o) => {
         const suyas = tareas.filter((x) => x.obraId === o.id);
         const hechas = suyas.filter((x) => x.estado === "completada").length;
         const abiertas = suyas.filter(abierta).length;
         const vencidas = suyas.filter((x) => vencida(x, hoy)).length;
+        const porcentaje = suyas.length
+          ? Math.round((hechas / suyas.length) * 100)
+          : 0;
         return (
           <li key={o.id}>
             <Link
               href={`/panel/tareas?obra=${o.id}`}
-              className="hoja group block p-4 shadow-xs transition-all hover:border-blue-300 hover:shadow-md dark:hover:border-blue-900/60 sm:p-5"
+              className="dashboard-obra"
             >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="truncate text-base font-bold text-tinta group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                  {o.nombre}
-                </span>
-                <span className="shrink-0 text-xs font-semibold text-gris">
-                  {hechas}/{suyas.length}
-                </span>
-              </div>
-              <div className="mt-3">
-                <Avance hechas={hechas} total={suyas.length} />
-              </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-gris">
-                <span>{suyas.length === 0 ? t.obras.sinTareas : t.obras.abiertas(abiertas)}</span>
-                {vencidas > 0 && (
-                  <span className="rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
-                    {t.obras.vencidas(vencidas)}
+              <ObraVisual />
+              <div className="dashboard-obra-info">
+                <h3>{o.nombre}</h3>
+                <div className="dashboard-obra-progreso">
+                  <Avance hechas={hechas} total={suyas.length} />
+                  <strong>{porcentaje}%</strong>
+                </div>
+                <p>
+                  <span>
+                    {suyas.length
+                      ? t.obras.abiertas(abiertas)
+                      : t.obras.sinTareas}
                   </span>
-                )}
+                  {vencidas > 0 && <b>{t.obras.vencidas(vencidas)}</b>}
+                </p>
               </div>
             </Link>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+function Vencimientos({ tareas, hoy }: { tareas: Tarea[]; hoy: string }) {
+  const { obras } = useStore();
+  const { dia } = useT();
+  return (
+    <section className="hoja vencimientos">
+      <header>
+        <h2>Próximos vencimientos</h2>
+        <Link href="/panel/tareas">Ver todas →</Link>
+      </header>
+      {tareas.length === 0 ? (
+        <p className="p-6 text-sm text-gris">
+          No hay tareas abiertas con fecha límite.
+        </p>
+      ) : (
+        <ul>
+          {tareas.slice(0, 5).map((tarea) => {
+            const dias = diasRestantes(tarea, hoy);
+            const atrasada = dias !== null && dias < 0;
+            const inminente = dias !== null && dias >= 0 && dias <= 3;
+            const etiqueta =
+              dias === null
+                ? ""
+                : dias < 0
+                  ? `Hace ${-dias} ${dias === -1 ? "día" : "días"}`
+                  : dias === 0
+                    ? "Hoy"
+                    : dias === 1
+                      ? "Mañana"
+                      : `En ${dias} días`;
+            return (
+              <li key={tarea.id}>
+                <Link
+                  href={`/panel/tareas/${tarea.id}`}
+                  className="vencimiento-fila"
+                >
+                  <span
+                    className="vencimiento-marca"
+                    style={{
+                      background: atrasada
+                        ? "var(--alerta)"
+                        : inminente
+                          ? "var(--advertencia)"
+                          : "var(--exito)",
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div className="vencimiento-datos">
+                    <strong>{tarea.titulo}</strong>
+                    <p>
+                      {codigoTarea(tarea.numero)} ·{" "}
+                      {obras.find((o) => o.id === tarea.obraId)?.nombre ??
+                        "Sin obra"}
+                    </p>
+                    <span className="mt-1 inline-flex">
+                      <Barras prioridad={tarea.prioridad} conTexto />
+                    </span>
+                  </div>
+                  <div className="vencimiento-fecha">
+                    <span>
+                      <Icon name="calendario" />
+                      {tarea.vence ? dia(tarea.vence) : ""}
+                    </span>
+                    <span
+                      className={`vencimiento-etiqueta ${atrasada ? "atrasada" : inminente ? "inminente" : ""}`}
+                    >
+                      {atrasada && <span className="sr-only">Vencida. </span>}
+                      {etiqueta}
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -134,111 +234,160 @@ export default function InicioPage() {
   const admin = perfil.rol === "admin";
   const abiertas = tareas.filter(abierta);
   const vencidas = abiertas.filter((x) => vencida(x, hoy)).sort(porFecha);
-  const proximas = abiertas.filter((x) => proxima(x, hoy)).sort(porFecha);
-  const fechas = [...vencidas, ...proximas];
-  const desde = hoy ? sumarDias(hoy, -30) : "";
-  const completadas = tareas.filter((x) => x.completada && x.completada.slice(0, 10) >= desde).length;
-  const nombre = perfil.nombre.split(" ")[0];
-  const enMarchaObras = obras.filter((o) => o.activa);
-  const cabecera = <Encabezado rotulo={hoy ? hoyLargo(hoy) : ""} titulo={t.inicio.hola(nombre)} />;
-
-  if (admin) {
-    const esperan = abiertas.filter((x) => ESPERA_ADMIN.includes(x.estado)).sort(porFecha);
-    const borradores = abiertas.filter((x) => x.estado === "borrador");
-    return (
-      <div className="space-y-10 sm:space-y-12">
-        {cabecera}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          <TarjetaKPI valor={abiertas.length} etiqueta={t.inicio.cifras.abiertas} />
-          <TarjetaKPI valor={esperan.length} etiqueta={t.inicio.cifras.porRevisar} tono="marca" />
-          <TarjetaKPI valor={vencidas.length} etiqueta={t.inicio.cifras.vencidas} tono="alerta" />
-          <TarjetaKPI valor={completadas} etiqueta={t.inicio.cifras.completadas} />
-        </div>
-
-        {enMarchaObras.length > 0 && (
-          <Seccion titulo={t.inicio.obras} cuenta={enMarchaObras.length}>
-            <Obras obras={enMarchaObras} tareas={tareas} hoy={hoy} />
-          </Seccion>
-        )}
-
-        <Seccion titulo={t.inicio.flujo}>
-          <Flujo tareas={abiertas} />
-        </Seccion>
-
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          <Seccion titulo={t.inicio.esperanPorTi} cuenta={esperan.length}>
-            <Renglones tareas={esperan} vacio={t.inicio.nadaPendiente} conResponsable />
-          </Seccion>
-          <Seccion titulo={t.inicio.fechas} cuenta={fechas.length}>
-            <Renglones tareas={fechas} vacio={t.inicio.sinFechas} conResponsable />
-          </Seccion>
-        </div>
-
-        {borradores.length > 0 && (
-          <Seccion titulo={t.inicio.sinAsignar} cuenta={borradores.length}>
-            <Renglones tareas={borradores} vacio="" />
-          </Seccion>
-        )}
-      </div>
-    );
-  }
-
-  // Para quien recibe tareas
-  const con = (...estados: Estado[]) => abiertas.filter((x) => estados.includes(x.estado)).sort(porFecha);
-  const porAceptar = con("asignada");
-  const devueltas = con("devuelta");
-  const enMarcha = con("aceptada", "en_curso");
-  const enEspera = con("aclaracion", "enviada", "en_revision");
+  const fechas = abiertas.filter((x) => x.vence).sort(porFecha);
+  const desde = hoy ? sumarDias(hoy, -29) : "";
+  const completadas = tareas.filter(
+    (x) =>
+      x.completada &&
+      hoy &&
+      fechaLocal(new Date(x.completada)) >= desde &&
+      fechaLocal(new Date(x.completada)) <= hoy,
+  ).length;
+  const activas = obras.filter((o) => o.activa);
+  const esperan = abiertas
+    .filter((x) => ESPERA_ADMIN.includes(x.estado))
+    .sort(porFecha);
+  const borradores = abiertas.filter((x) => x.estado === "borrador");
+  const porAceptar = abiertas.filter((x) => x.estado === "asignada");
+  const devueltas = abiertas.filter((x) => x.estado === "devuelta");
+  const enMarcha = abiertas.filter(
+    (x) => x.estado === "aceptada" || x.estado === "en_curso",
+  );
+  const enEspera = abiertas.filter((x) => ESPERA_ADMIN.includes(x.estado));
+  const avances = activas.map((o) => {
+    const suyas = tareas.filter((x) => x.obraId === o.id);
+    return suyas.length
+      ? (suyas.filter((x) => x.estado === "completada").length / suyas.length) *
+          100
+      : 0;
+  });
+  const promedio = avances.length
+    ? `${Math.round(avances.reduce((s, n) => s + n, 0) / avances.length)}%`
+    : "—";
 
   return (
-    <div className="space-y-10 sm:space-y-12">
-      {cabecera}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-        <TarjetaKPI valor={porAceptar.length + devueltas.length} etiqueta={t.inicio.tuTurno} tono="marca" />
-        <TarjetaKPI valor={enMarcha.length} etiqueta={t.inicio.enMarcha} />
-        <TarjetaKPI valor={vencidas.length} etiqueta={t.inicio.cifras.vencidas} tono="alerta" />
-        <TarjetaKPI valor={completadas} etiqueta={t.inicio.cifras.completadas} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <div className="space-y-8">
-          {porAceptar.length + devueltas.length + enMarcha.length === 0 && (
-            <Seccion titulo={t.inicio.tuTurno}>
-              <Renglones tareas={[]} vacio={t.inicio.nadaPendiente} />
-            </Seccion>
-          )}
-          {porAceptar.length > 0 && (
-            <Seccion titulo={t.inicio.porAceptar} cuenta={porAceptar.length}>
-              <Renglones tareas={porAceptar} vacio="" />
-            </Seccion>
-          )}
-          {devueltas.length > 0 && (
-            <Seccion titulo={t.inicio.devueltas} cuenta={devueltas.length}>
-              <Renglones tareas={devueltas} vacio="" />
-            </Seccion>
-          )}
-          {enMarcha.length > 0 && (
-            <Seccion titulo={t.inicio.enMarcha} cuenta={enMarcha.length}>
-              <Renglones tareas={enMarcha} vacio="" />
-            </Seccion>
-          )}
+    <div className="dashboard">
+      <header className="dashboard-cabecera">
+        <div>
+          <p className="dashboard-fecha">{hoy ? hoyLargo(hoy) : ""}</p>
+          <h1>{t.inicio.hola(perfil.nombre.split(" ")[0])}</h1>
+          <p>Así va el avance de {admin ? "tus obras" : "tus tareas"} hoy.</p>
         </div>
-        <div className="space-y-8">
-          <Seccion titulo={t.inicio.fechas} cuenta={fechas.length}>
-            <Renglones tareas={fechas} vacio={t.inicio.sinFechas} />
+        {admin && (
+          <Link href="/panel/tareas?nueva=1" className="btn btn-marca">
+            <Icon name="mas" />
+            Nueva tarea
+          </Link>
+        )}
+      </header>
+      <div className="dashboard-kpis">
+        <TarjetaKPI
+          valor={admin ? abiertas.length : porAceptar.length + devueltas.length}
+          etiqueta={admin ? "Tareas abiertas" : t.inicio.tuTurno}
+          icono="tareas"
+        />
+        <TarjetaKPI
+          valor={admin ? esperan.length : enMarcha.length}
+          etiqueta={admin ? t.inicio.cifras.porRevisar : t.inicio.enMarcha}
+          icono="revisar"
+          tono="kpi-revisar"
+        />
+        <TarjetaKPI
+          valor={vencidas.length}
+          etiqueta={t.inicio.cifras.vencidas}
+          icono="alerta"
+          tono="kpi-alerta"
+        />
+        <TarjetaKPI
+          valor={completadas}
+          etiqueta={t.inicio.cifras.completadas}
+          icono="check"
+          tono="kpi-exito"
+        />
+      </div>
+      <div className="dashboard-cuerpo">
+        <div className="dashboard-columna">
+          <Seccion titulo={t.inicio.obras} cuenta={activas.length}>
+            {activas.length ? (
+              <Obras obras={activas} tareas={tareas} hoy={hoy} />
+            ) : (
+              <div className="hoja p-6 text-sm text-gris">
+                {admin
+                  ? "Crea tu primera obra desde el módulo Obras."
+                  : "Tus obras aparecerán aquí cuando tengas tareas asignadas."}
+              </div>
+            )}
           </Seccion>
-          {enEspera.length > 0 && (
-            <Seccion titulo={t.inicio.enEspera} cuenta={enEspera.length}>
-              <Renglones tareas={enEspera} vacio="" />
-            </Seccion>
+          <Seccion titulo={t.inicio.flujo}>
+            <Flujo tareas={tareas} />
+          </Seccion>
+          {admin ? (
+            <>
+              <Seccion titulo={t.inicio.esperanPorTi} cuenta={esperan.length}>
+                <Renglones
+                  tareas={esperan}
+                  vacio={t.inicio.nadaPendiente}
+                  conResponsable
+                />
+              </Seccion>
+              {borradores.length > 0 && (
+                <Seccion
+                  titulo={t.inicio.sinAsignar}
+                  cuenta={borradores.length}
+                >
+                  <Renglones tareas={borradores} vacio="" />
+                </Seccion>
+              )}
+            </>
+          ) : (
+            <>
+              <Seccion titulo={t.inicio.porAceptar} cuenta={porAceptar.length}>
+                <Renglones
+                  tareas={porAceptar.sort(porFecha)}
+                  vacio={t.inicio.nadaPendiente}
+                />
+              </Seccion>
+              {devueltas.length > 0 && (
+                <Seccion titulo={t.inicio.devueltas} cuenta={devueltas.length}>
+                  <Renglones tareas={devueltas.sort(porFecha)} vacio="" />
+                </Seccion>
+              )}
+              {enMarcha.length > 0 && (
+                <Seccion titulo={t.inicio.enMarcha} cuenta={enMarcha.length}>
+                  <Renglones tareas={enMarcha.sort(porFecha)} vacio="" />
+                </Seccion>
+              )}
+              {enEspera.length > 0 && (
+                <Seccion titulo={t.inicio.enEspera} cuenta={enEspera.length}>
+                  <Renglones tareas={enEspera.sort(porFecha)} vacio="" />
+                </Seccion>
+              )}
+            </>
           )}
         </div>
-      </div>
-
-      <div>
-        <Link href="/panel/tareas" className="btn btn-linea inline-flex items-center gap-2 text-sm font-semibold">
-          {t.inicio.verTodas} <span>→</span>
-        </Link>
+        <div className="dashboard-columna">
+          <section className="hoja resumen-general">
+            <h2>
+              <Icon name="avance" />
+              Resumen general
+            </h2>
+            <div className="resumen-cifras">
+              <div>
+                <strong>{promedio}</strong>
+                <span>{admin ? "Avance promedio de obras activas" : "Avance de tus tareas por obra"}</span>
+              </div>
+              <div>
+                <strong>{activas.length}</strong>
+                <span>Obras activas</span>
+              </div>
+              <div>
+                <strong>{tareas.length}</strong>
+                <span>Tareas totales</span>
+              </div>
+            </div>
+          </section>
+          <Vencimientos tareas={fechas} hoy={hoy} />
+        </div>
       </div>
     </div>
   );

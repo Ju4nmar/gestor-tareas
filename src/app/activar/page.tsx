@@ -5,17 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Marco } from "@/components/Marco";
 import { Cargando, falloDe } from "@/components/ui";
-import { activar, activarConSesion, infoInvitacion, salir, useStore } from "@/lib/store";
+import { activar, activarConSesion, entrar, infoInvitacion, salir, salirDemo, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 
-type Invitacion = { name: string; email: string } | { vencida: true };
+type Invitacion = { name: string; email: string; company: string } | { vencida: true };
 
 export default function ActivarPage() {
-  const { listo, perfil, email } = useStore();
+  const { listo, email, demo } = useStore();
   const { t } = useT();
   const router = useRouter();
   const codigo = (useSearchParams().get("codigo") ?? "").trim();
   const [invitacion, setInvitacion] = useState<Invitacion | null | undefined>(codigo ? undefined : null);
+  const [existente, setExistente] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [porConfirmar, setPorConfirmar] = useState(false);
@@ -31,15 +32,12 @@ export default function ActivarPage() {
     };
   }, [codigo]);
 
-  useEffect(() => {
-    if (listo && perfil) router.replace("/panel");
-  }, [listo, perfil, router]);
-
   const intentar = async (paso: () => Promise<void>) => {
     setEnviando(true);
     setError("");
     try {
       await paso();
+      router.replace("/panel");
     } catch (e) {
       const fallo = falloDe(e);
       if (fallo === "confirmar") setPorConfirmar(true);
@@ -53,6 +51,13 @@ export default function ActivarPage() {
     event.preventDefault();
     if (!invitacion || "vencida" in invitacion) return;
     const data = new FormData(event.currentTarget);
+    if (existente) {
+      void intentar(async () => {
+        await entrar(invitacion.email, String(data.get("clave")));
+        await activarConSesion(codigo);
+      });
+      return;
+    }
     if (data.get("clave") !== data.get("repetir")) return setError(t.activar.distintas);
     void intentar(() => activar(codigo, invitacion.email, String(data.get("clave"))));
   };
@@ -61,7 +66,9 @@ export default function ActivarPage() {
 
   return (
     <Marco titulo={t.activar.titulo}>
-      {!invitacion ? (
+      {demo ? (
+        <button className="btn btn-linea mt-5" onClick={salirDemo}>Salir de la demo para aceptar la invitación</button>
+      ) : !invitacion ? (
         <div className="mt-4 space-y-4">
           <p className="text-sm leading-relaxed text-gris">{t.activar.invalida}</p>
           <Link href="/" className="btn btn-linea inline-flex">
@@ -79,6 +86,7 @@ export default function ActivarPage() {
       ) : email ? (
         <div className="mt-4 space-y-4">
           <p className="text-sm font-semibold text-tinta">{t.activar.hola(invitacion.name)}</p>
+          <p className="text-sm text-gris">Empresa {invitacion.company}</p>
           <p className="font-mono text-xs text-gris">{email}</p>
           {error && (
             <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
@@ -98,21 +106,22 @@ export default function ActivarPage() {
         <form onSubmit={crear} className="mt-5 space-y-4">
           <div>
             <p className="text-sm font-semibold text-tinta">{t.activar.hola(invitacion.name)}</p>
+            <p className="text-sm text-gris">Empresa {invitacion.company}</p>
             <p className="font-mono text-xs text-gris">{invitacion.email}</p>
           </div>
           <div>
             <label className="etiqueta" htmlFor="clave">
               {t.activar.clave}
             </label>
-            <input className="campo" id="clave" name="clave" type="password" minLength={8} autoComplete="new-password" required />
+            <input className="campo" id="clave" name="clave" type="password" minLength={8} autoComplete={existente ? "current-password" : "new-password"} required />
             <p className="mt-1 text-xs text-gris">{t.activar.claveAyuda}</p>
           </div>
-          <div>
+          {!existente && <div>
             <label className="etiqueta" htmlFor="repetir">
               {t.activar.repetir}
             </label>
             <input className="campo" id="repetir" name="repetir" type="password" minLength={8} autoComplete="new-password" required />
-          </div>
+          </div>}
           {error && (
             <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
               {error}
@@ -121,6 +130,7 @@ export default function ActivarPage() {
           <button className="btn btn-marca w-full" disabled={enviando}>
             {enviando ? t.activar.activando : t.activar.boton}
           </button>
+          <button type="button" className="enlace text-sm" disabled={enviando} onClick={() => { setExistente(!existente); setError(""); }}>{existente ? "Crear una cuenta" : "Ya tengo cuenta. Iniciar sesión"}</button>
         </form>
       )}
     </Marco>

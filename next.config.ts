@@ -14,7 +14,11 @@ const seguridad = [
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  devIndicators: {
+    position: "bottom-left",
+  },
   turbopack: {
+    root: __dirname,
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],
