@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 import * as demo from "./demo";
 import { fechaLocal } from "./fechas";
 import { ErrorFlujo } from "./flujo";
-import { supabase } from "./supabase";
+import { seleccionarEmpresaApi, supabase } from "./supabase";
 import { idiomaActual } from "./textos";
 import type {
   Accion,
@@ -13,6 +13,7 @@ import type {
   ClienteObra,
   DatosTarea,
   Etapa,
+  Empresa,
   Evento,
   Fallo,
   Obra,
@@ -31,6 +32,10 @@ export type State = {
   listo: boolean;
   /** Correo de la sesión, tenga o no acceso. */
   email: string | null;
+  nombreCuenta: string;
+  empresas: Empresa[];
+  empresa: Empresa | null;
+  ocupado: boolean;
   /** Perfil activo de quien usa la aplicación; nulo si no ha entrado o no tiene acceso. */
   perfil: Perfil | null;
   desactivada: boolean;
@@ -54,6 +59,10 @@ export type State = {
 const initial: State = {
   listo: false,
   email: null,
+  nombreCuenta: "",
+  empresas: [],
+  empresa: null,
+  ocupado: false,
   perfil: null,
   desactivada: false,
   demo: false,
@@ -71,6 +80,9 @@ const initial: State = {
 
 let state = initial;
 let started = false;
+let revision = 0;
+let sesionActual: Session | null = null;
+let operacionesPendientes = 0;
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<State>) {
@@ -137,6 +149,8 @@ function ponerDemo(b: demo.Base) {
     desactivada: false,
     cargado: true,
     error: false,
+    empresas: [],
+    empresa: null,
     tareas,
     archivadas,
     eventos: b.eventos.filter((e) => visibles.has(e.tareaId)),
@@ -149,6 +163,9 @@ function ponerDemo(b: demo.Base) {
 }
 
 export function entrarDemo(rol: Rol) {
+  revision++;
+  seleccionarEmpresaApi(null);
+  firmadas.clear();
   const b = semillaDemo();
   b.yo = rol === "admin" ? "admin" : rol === "cliente" ? "c1" : "p1";
   ponerDemo(b);
@@ -317,9 +334,11 @@ const aSeguimiento = (f: FilaSeguimiento): ObraCliente => ({
 /** Trae tareas, historial, equipo, obras y archivos. La base de datos entrega solo lo que esa persona puede ver. */
 export async function recargar() {
   if (state.demo || !state.perfil) return;
+  const consultaRevision = revision;
   if (state.perfil.rol === "cliente") {
     // El cliente no lee las tablas: una función le arma el resumen de sus obras.
     const { data, error } = await supabase.rpc("tm_client_view");
+    if (consultaRevision !== revision) return;
     if (error) return set({ cargado: true, error: true });
     return set({ cargado: true, error: false, seguimiento: ((data ?? []) as FilaSeguimiento[]).map(aSeguimiento) });
   }
@@ -331,6 +350,7 @@ export async function recargar() {
     supabase.from("tm_files").select("*").order("created_at", { ascending: false }),
     supabase.from("tm_project_clients").select("project_id, profile_id"),
   ]);
+  if (consultaRevision !== revision) return;
   if (tareas.error || eventos.error || perfiles.error || obras.error || archivos.error || clientes.error) {
     return set({ cargado: true, error: true });
   }
@@ -352,30 +372,92 @@ export async function recargar() {
   });
 }
 
-async function aplicarSesion(session: Session | null) {
-  if (state.demo) return;
-  if (!session) return set({ ...initial, listo: true });
-  // La base de datos dice quién es: su perfil, o nada si no tiene acceso.
-  const { data } = await supabase.rpc("tm_enter");
-  const perfil = data ? aPerfil(data as FilaPerfil) : null;
-  set({
-    listo: true,
-    email: session.user.email ?? "",
-    perfil: perfil?.activo ? perfil : null,
-    desactivada: Boolean(perfil && !perfil.activo),
-  });
-  await recargar();
+type FilaEmpresa = { id: string; name: string; profile_id: string; role: Rol };
+const aEmpresa = (fila: FilaEmpresa): Empresa => ({ id: fila.id, nombre: fila.name, perfilId: fila.profile_id, rol: fila.role });
+
+function recordarEmpresa(id: string | null, email: string) {
+  try {
+    const clave = `trazo-empresa:${email}`;
+    if (id) window.sessionStorage.setItem(clave, id);
+    else window.sessionStorage.removeItem(clave);
+  } catch {
+    // La seleccion funciona durante esta visita sin almacenamiento.
+  }
 }
+
+export async function seleccionarEmpresa(id: string) {
+  if (state.demo || operacionesPendientes > 0) throw new ErrorFlujo("ocupado");
+  const empresa = state.empresas.find((item) => item.id === id);
+  if (!empresa || !state.email) throw new ErrorFlujo("permiso");
+  const accesoRevision = ++revision;
+  const { email, empresas, nombreCuenta } = state;
+  seleccionarEmpresaApi(id);
+  firmadas.clear();
+  set({ ...initial, email, empresas, empresa, nombreCuenta });
+  try {
+    const { data, error } = await supabase.rpc("tm_enter");
+    if (accesoRevision !== revision) return;
+    if (error || !data) throw new ErrorFlujo("permiso");
+    const perfil = aPerfil(data as FilaPerfil);
+    recordarEmpresa(id, email);
+    set({ listo: true, perfil, desactivada: false });
+    await recargar();
+  } catch (error) {
+    if (accesoRevision !== revision) return;
+    seleccionarEmpresaApi(null);
+    recordarEmpresa(null, email);
+    set({ listo: true, perfil: null, empresa: null, cargado: true, error: true });
+    throw error;
+  }
+}
+
+async function aplicarSesion(session: Session | null, preferida?: string) {
+  if (state.demo) return;
+  const accesoRevision = ++revision;
+  sesionActual = session;
+  seleccionarEmpresaApi(null);
+  firmadas.clear();
+  const email = session?.user.email ?? null;
+  const nombreCuenta = typeof session?.user.user_metadata.full_name === "string" ? session.user.user_metadata.full_name : "";
+  set({ ...initial, email, nombreCuenta, ocupado: operacionesPendientes > 0 });
+  if (!session) return set({ listo: true });
+  try {
+    const { data, error } = await supabase.rpc("tm_list_companies");
+    if (accesoRevision !== revision) return;
+    if (error) throw error;
+    const empresas = ((data ?? []) as FilaEmpresa[]).map(aEmpresa);
+    set({ empresas });
+    let guardada = preferida;
+    try {
+      guardada ??= window.sessionStorage.getItem(`trazo-empresa:${email}`) ?? undefined;
+    } catch { /* La seleccion puede hacerse manualmente. */ }
+    const elegida = empresas.find((item) => item.id === guardada) ?? (empresas.length === 1 ? empresas[0] : undefined);
+    if (elegida && operacionesPendientes === 0) await seleccionarEmpresa(elegida.id);
+    else set({ listo: true });
+  } catch {
+    if (accesoRevision === revision) set({ listo: true, cargado: true, error: true });
+  }
+}
+
+export const recargarAcceso = () => aplicarSesion(sesionActual);
 
 function start() {
   const muestra = leerDemo();
   if (muestra) return ponerDemo(muestra);
   supabase.auth.onAuthStateChange((_event, session) => {
-    // Las consultas van fuera del callback: dentro pueden bloquear al cliente de auth.
-    setTimeout(() => void aplicarSesion(session), 0);
+    // Las consultas se ejecutan fuera del bloqueo de Supabase Auth.
+    setTimeout(() => {
+      if (state.demo) return;
+      if (session && sesionActual?.user.id === session.user.id) {
+        sesionActual = session;
+        void recargar();
+      } else void aplicarSesion(session);
+    }, 0);
   });
-  // Al volver a la pestaña se refresca, por si alguien más movió una tarea.
-  window.addEventListener("focus", () => void recargar());
+  window.addEventListener("focus", () => {
+    if (state.email && !state.perfil) void recargarAcceso();
+    else void recargar();
+  });
 }
 
 // --- Operaciones ------------------------------------------------------------
@@ -406,6 +488,9 @@ const FALLOS = new Set<string>([
   "archivada",
   "no_archivada",
   "archivo",
+  "confirmar",
+  "ocupado",
+  "empresa_cambio",
 ]);
 
 async function rpc<T>(nombre: string, args: Record<string, unknown>) {
@@ -422,9 +507,28 @@ async function cambiar<T>(real: () => Promise<T>, enDemo: (b: demo.Base) => T): 
     ponerDemo(copia);
     return resultado;
   }
-  const resultado = await real();
-  await recargar();
-  return resultado;
+  return enOperacion(async () => {
+    const operacionRevision = revision;
+    const resultado = await real();
+    comprobarRevision(operacionRevision);
+    await recargar();
+    return resultado;
+  });
+}
+
+function comprobarRevision(esperada: number) {
+  if (esperada !== revision) throw new ErrorFlujo("empresa_cambio");
+}
+
+async function enOperacion<T>(operacion: () => Promise<T>): Promise<T> {
+  operacionesPendientes++;
+  set({ ocupado: true });
+  try {
+    return await operacion();
+  } finally {
+    operacionesPendientes--;
+    set({ ocupado: operacionesPendientes > 0 });
+  }
 }
 
 /** Crea la tarea (sin `id`) o la edita. Devuelve su id. */
@@ -589,7 +693,13 @@ const comoDataUrl = (blob: Blob) =>
 
 /** Sube fotos o PDF y los deja adjuntos a la tarea. */
 export async function subirArchivos(tareaId: string, files: File[]) {
+  return enOperacion(() => subirArchivosEnEmpresa(tareaId, files));
+}
+
+async function subirArchivosEnEmpresa(tareaId: string, files: File[]) {
+  const operacionRevision = revision;
   for (const file of files) {
+    comprobarRevision(operacionRevision);
     if (state.demo && base) {
       // En la muestra la foto se guarda pequeña en la pestaña; un PDF solo queda con su nombre.
       const { blob, nombre, tipo } = await preparar(file, 900);
@@ -600,10 +710,12 @@ export async function subirArchivos(tareaId: string, files: File[]) {
       continue;
     }
     const { blob, nombre, tipo } = await preparar(file, 1800);
+    comprobarRevision(operacionRevision);
     const ruta = `${tareaId}/${crypto.randomUUID()}.${tipo === "image/jpeg" ? "jpg" : "pdf"}`;
     const { error } = await supabase.storage.from(ALMACEN).upload(ruta, blob, { contentType: tipo });
     if (error) throw new ErrorFlujo("archivo");
     try {
+      comprobarRevision(operacionRevision);
       await rpc("tm_add_file", { p_task: tareaId, p_path: ruta, p_name: nombre, p_mime: tipo, p_size: blob.size });
     } catch (e) {
       // La base de datos no lo aceptó (por ejemplo, la tarea se archivó): no se deja suelto en el almacén.
@@ -632,6 +744,7 @@ const firmadas = new Map<string, { url: string; hasta: number }>();
  * que duran una hora y solo a quien puede ver la tarea.
  */
 export async function urlsDe(archivos: Archivo[]) {
+  const consultaRevision = revision;
   const ahora = Date.now();
   const pendientes = archivos.filter((a) => !a.url && a.ruta && !((firmadas.get(a.ruta)?.hasta ?? 0) > ahora));
   if (pendientes.length) {
@@ -639,6 +752,7 @@ export async function urlsDe(archivos: Archivo[]) {
       pendientes.map((a) => a.ruta),
       3600,
     );
+    if (consultaRevision !== revision) return {};
     for (const f of data ?? []) {
       if (f.path && f.signedUrl) firmadas.set(f.path, { url: f.signedUrl, hasta: ahora + 50 * 60_000 });
     }
@@ -649,32 +763,35 @@ export async function urlsDe(archivos: Archivo[]) {
 // --- Cuenta -----------------------------------------------------------------
 
 export async function entrar(email: string, clave: string) {
-  const { error } = await supabase.auth.signInWithPassword({ email, password: clave });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: clave });
   if (error) throw new ErrorFlujo(error.code === "email_not_confirmed" ? "confirmar" : "credenciales");
+  await aplicarSesion(data.session);
 }
 
 export async function salir() {
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) throw new ErrorFlujo("error");
+  await aplicarSesion(null);
 }
 
 /**
  * Nombre y correo de una invitación pendiente; `{ vencida: true }` si su código ya venció
  * (no se revela a quién era); nulo si el código no sirve.
  */
-export type InfoInvitacion = { name: string; email: string } | { vencida: true } | null;
+export type InfoInvitacion = { name: string; email: string; company: string } | { vencida: true } | null;
 
 export async function infoInvitacion(codigo: string): Promise<InfoInvitacion> {
   const { data } = await supabase.rpc("tm_invite_info", { p_code: codigo });
   if (!data) return null;
   if ((data as { expired?: boolean }).expired) return { vencida: true };
-  return data as { name: string; email: string };
+  return data as { name: string; email: string; company: string };
 }
 
 /** Une la sesión actual con su invitación y carga el perfil. */
 export async function activarConSesion(codigo: string) {
-  await rpc("tm_activate", { p_code: codigo });
+  const perfil = await rpc<FilaPerfil & { company_id: string }>("tm_activate", { p_code: codigo });
   const { data } = await supabase.auth.getSession();
-  await aplicarSesion(data.session);
+  await aplicarSesion(data.session, perfil.company_id);
 }
 
 /**
@@ -689,7 +806,7 @@ export async function activar(codigo: string, email: string, clave: string) {
     password: clave,
     options: { emailRedirectTo: `${window.location.origin}/activar?codigo=${encodeURIComponent(codigo)}` },
   });
-  if (alta.error?.code === "weak_password") throw new ErrorFlujo("clave");
+  if (alta.error) throw new ErrorFlujo(alta.error.code === "weak_password" ? "clave" : "error");
   if (!alta.data.session) {
     const { error } = await supabase.auth.signInWithPassword({ email, password: clave });
     if (error) throw new ErrorFlujo("confirmar");
@@ -699,11 +816,32 @@ export async function activar(codigo: string, email: string, clave: string) {
 
 /** Envía el correo para crear una contraseña nueva. */
 export async function pedirClave(email: string) {
-  await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/restablecer` });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/restablecer` });
+  if (error) throw new ErrorFlujo("error");
 }
 
 export async function cambiarClave(clave: string) {
   if (clave.length < 8) throw new ErrorFlujo("clave");
   const { error } = await supabase.auth.updateUser({ password: clave });
   if (error) throw new ErrorFlujo(error.code === "weak_password" ? "clave" : "error");
+}
+
+
+/** Registro de una cuenta personal. La empresa se crea tras confirmar el correo. */
+export async function registrar(nombre: string, email: string, clave: string) {
+  if (nombre.trim().length < 2 || nombre.trim().length > 80) throw new ErrorFlujo("nombre");
+  if (clave.length < 8) throw new ErrorFlujo("clave");
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim().toLowerCase(),
+    password: clave,
+    options: { data: { full_name: nombre.trim() }, emailRedirectTo: `${window.location.origin}/empresas` },
+  });
+  if (error) throw new ErrorFlujo(error.code === "weak_password" ? "clave" : "error");
+  return Boolean(data.session);
+}
+
+export async function crearEmpresa(id: string, nombre: string, persona: string) {
+  await enOperacion(() => rpc("tm_create_company", { p_id: id, p_name: nombre.trim(), p_person_name: persona.trim() }));
+  await aplicarSesion(sesionActual, id);
+  if (state.empresa?.id !== id || !state.perfil) throw new ErrorFlujo("error");
 }

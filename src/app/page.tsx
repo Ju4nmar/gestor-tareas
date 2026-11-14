@@ -1,16 +1,16 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Ajustes, Logo, falloDe } from "@/components/ui";
 import { Arquitectura } from "@/components/Arquitectura";
 import { Icon } from "@/components/Icon";
-import { entrar, entrarDemo, pedirClave, salir, useStore } from "@/lib/store";
+import { entrar, entrarDemo, pedirClave, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
-import type { Rol } from "@/lib/types";
 
 export default function EntradaPage() {
-  const { listo, perfil, email, desactivada } = useStore();
+  const { listo, perfil, email } = useStore();
   const { t } = useT();
   const router = useRouter();
   const [correo, setCorreo] = useState("");
@@ -21,8 +21,8 @@ export default function EntradaPage() {
   const [aviso, setAviso] = useState("");
 
   useEffect(() => {
-    if (listo && perfil) router.replace("/panel");
-  }, [listo, perfil, router]);
+    if (listo && email) router.replace(perfil ? "/panel" : "/empresas");
+  }, [listo, perfil, email, router]);
 
   const muestra = useSearchParams().get("demo");
   useEffect(() => {
@@ -63,12 +63,6 @@ export default function EntradaPage() {
       setRecuperando(false);
     }
   };
-
-  const demo = (rol: Rol) => {
-    entrarDemo(rol);
-    router.push("/panel");
-  };
-  const sinAcceso = listo && email && !perfil;
 
   return (
     <main className="entrada-trazo">
@@ -126,134 +120,112 @@ export default function EntradaPage() {
             <h2>{t.entrada.titulo}</h2>
             <p>Accede a tu cuenta para continuar</p>
           </div>
-          {sinAcceso ? (
-            <div className="space-y-5" role="status">
-              <p className="text-sm leading-relaxed text-gris">
-                {desactivada
-                  ? t.entrada.desactivada
-                  : t.entrada.sinAcceso(email ?? "")}
-              </p>
-              <button
-                type="button"
-                className="btn btn-linea w-full"
-                onClick={() => void salir()}
-              >
-                {t.comun.salir}
-              </button>
-            </div>
-          ) : (
-            <>
-              <form
-                onSubmit={enviar}
-                className="entrada-form"
-                aria-busy={enviando}
-              >
-                <div>
-                  <label className="etiqueta" htmlFor="correo">
-                    {t.entrada.correo}
-                  </label>
-                  <div className="campo-icono">
-                    <Icon name="correo" />
-                    <input
-                      className="campo"
-                      id="correo"
-                      type="email"
-                      autoComplete="username"
-                      placeholder="tu@correo.com"
-                      required
-                      value={correo}
-                      onChange={(e) => setCorreo(e.target.value)}
-                      aria-describedby={
-                        error
-                          ? "entrada-error"
-                          : aviso
-                            ? "entrada-aviso"
-                            : undefined
-                      }
-                    />
-                  </div>
+          <>
+            <form
+              onSubmit={enviar}
+              className="entrada-form"
+              aria-busy={enviando}
+            >
+              <div>
+                <label className="etiqueta" htmlFor="correo">
+                  {t.entrada.correo}
+                </label>
+                <div className="campo-icono">
+                  <Icon name="correo" />
+                  <input
+                    className="campo"
+                    id="correo"
+                    type="email"
+                    autoComplete="username"
+                    placeholder="tu@correo.com"
+                    required
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    aria-describedby={
+                      error
+                        ? "entrada-error"
+                        : aviso
+                          ? "entrada-aviso"
+                          : undefined
+                    }
+                  />
                 </div>
-                <div>
-                  <label className="etiqueta" htmlFor="clave">
-                    {t.entrada.clave}
-                  </label>
-                  <div className="campo-icono">
-                    <Icon name="candado" />
-                    <input
-                      className="campo campo-clave"
-                      id="clave"
-                      name="clave"
-                      type={visible ? "text" : "password"}
-                      autoComplete="current-password"
-                      placeholder="Tu contraseña"
-                      required
-                      aria-describedby={error ? "entrada-error" : undefined}
-                    />
-                    <button
-                      type="button"
-                      className="mostrar-clave"
-                      aria-label={
-                        visible ? "Ocultar contraseña" : "Mostrar contraseña"
-                      }
-                      aria-pressed={visible}
-                      onClick={() => setVisible(!visible)}
-                    >
-                      <Icon name={visible ? "ocultar" : "ojo"} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-end">
+              </div>
+              <div>
+                <label className="etiqueta" htmlFor="clave">
+                  {t.entrada.clave}
+                </label>
+                <div className="campo-icono">
+                  <Icon name="candado" />
+                  <input
+                    className="campo campo-clave"
+                    id="clave"
+                    name="clave"
+                    type={visible ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="Tu contraseña"
+                    required
+                    aria-describedby={error ? "entrada-error" : undefined}
+                  />
                   <button
                     type="button"
-                    className="enlace text-xs"
-                    onClick={() => void olvido()}
-                    disabled={recuperando}
+                    className="mostrar-clave"
+                    aria-label={
+                      visible ? "Ocultar contraseña" : "Mostrar contraseña"
+                    }
+                    aria-pressed={visible}
+                    onClick={() => setVisible(!visible)}
                   >
-                    {recuperando ? "Enviando enlace…" : t.entrada.olvido}
+                    <Icon name={visible ? "ocultar" : "ojo"} />
                   </button>
                 </div>
-                {error && (
-                  <p id="entrada-error" role="alert" className="mensaje-error">
-                    {error}
-                  </p>
-                )}
-                {aviso && (
-                  <p id="entrada-aviso" role="status" className="mensaje-info">
-                    {aviso}
-                  </p>
-                )}
+              </div>
+              <div className="flex justify-end">
                 <button
-                  className="btn btn-marca entrada-submit w-full"
-                  disabled={enviando || !listo}
+                  type="button"
+                  className="enlace text-xs"
+                  onClick={() => void olvido()}
+                  disabled={recuperando}
                 >
-                  {enviando
-                    ? t.entrada.entrando
-                    : !listo
-                      ? "Preparando acceso…"
-                      : t.entrada.boton}
-                  <Icon name="flecha" />
-                </button>
-              </form>
-              <div className="demo-separador">
-                <span>{t.entrada.demo}</span>
-              </div>
-              <div className="demo-accesos">
-                <button type="button" onClick={() => demo("admin")}>
-                  <Icon name="corona" />
-                  <span>{t.entrada.demoAdmin}</span>
-                </button>
-                <button type="button" onClick={() => demo("empleado")}>
-                  <Icon name="equipo" />
-                  <span>{t.entrada.demoEmpleado}</span>
-                </button>
-                <button type="button" onClick={() => demo("cliente")}>
-                  <Icon name="casco" />
-                  <span>{t.entrada.demoCliente}</span>
+                  {recuperando ? "Enviando enlace…" : t.entrada.olvido}
                 </button>
               </div>
-              <p className="demo-nota">{t.entrada.demoNota}</p>
-            </>
-          )}
+              {error && (
+                <p id="entrada-error" role="alert" className="mensaje-error">
+                  {error}
+                </p>
+              )}
+              {aviso && (
+                <p id="entrada-aviso" role="status" className="mensaje-info">
+                  {aviso}
+                </p>
+              )}
+              <button
+                className="btn btn-marca entrada-submit w-full"
+                disabled={enviando || !listo}
+              >
+                {enviando
+                  ? t.entrada.entrando
+                  : !listo
+                    ? "Preparando acceso…"
+                    : t.entrada.boton}
+                <Icon name="flecha" />
+              </button>
+            </form>
+            <Link
+              href="/registro"
+              className="btn btn-linea mt-4 flex w-full justify-center"
+            >
+              Crear cuenta
+            </Link>
+            <div className="demo-separador">
+              <span>Conoce TRAZO</span>
+            </div>
+            <Link href="/demo" className="enlace block text-center text-sm">
+              Explorar demo
+            </Link>
+            <p className="demo-nota">{t.entrada.demoNota}</p>
+          </>
         </div>
       </section>
     </main>

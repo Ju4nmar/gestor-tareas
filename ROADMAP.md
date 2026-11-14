@@ -47,3 +47,12 @@ validación de notas, tareas archivadas y paridad estricta entre `flujo.ts` y la
 Decididas tras el piloto con el primer cliente (obra real, 2 a 3 semanas). Candidatas, sin orden:
 notificaciones, plantillas de obra, informe semanal al cliente con fotos, vista tablero, personalización
 por cliente (logo, color, nombre), paginación, cabecera CSP (primero en modo solo reporte), multiempresa.
+
+## TRAZO multiempresa
+
+Rama `feature/trazo-multiempresa`, basada en `feature/trazo-redesign`.
+Proyecto dedicado `dcwmzdsefflgodwyhadp` instalado desde cero. Registro, creación y selección de
+empresa, roles por membresía, invitaciones para cuentas existentes y aislamiento RLS implementados.
+Pruebas SQL transaccionales en `supabase/tests/empresas.sql`.
+Pendientes operativos del propietario, configurar URLs de Auth y correo SMTP, verificar la
+confirmación de su cuenta real y autorizar la publicación cuando corresponda.

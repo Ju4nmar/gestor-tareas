@@ -141,7 +141,7 @@ function Avatar({ nombre }: { nombre: string }) {
 
 /** Marco de la aplicación: comprueba el acceso y pinta el menú según el rol. */
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { listo, perfil, demo, cargado, error, tareas } = useStore();
+  const { listo, perfil, demo, cargado, error, tareas, email, empresa } = useStore();
   const { t } = useT();
   const router = useRouter();
   const pathname = usePathname();
@@ -172,8 +172,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   // Sin acceso no hay panel: de vuelta a la entrada.
   useEffect(() => {
-    if (listo && !perfil) router.replace("/");
-  }, [listo, perfil, router]);
+    if (listo && !perfil) router.replace(email ? "/empresas" : "/");
+  }, [listo, perfil, email, router]);
 
   // Mientras se comprueba el acceso, la página se monta oculta.
   if (!listo || !perfil || !cargado) {
@@ -231,7 +231,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {demo && <BarraDemo />}
         <header className="sticky top-0 z-20 border-b border-regla bg-hoja/90 backdrop-blur-md">
           <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3.5">
-            <Logo />
+            <div>
+              <Logo />
+              {empresa && (
+                <Link href="/empresas" className="enlace mt-2 block text-xs">
+                  {empresa.nombre} · Cambiar empresa
+                </Link>
+              )}
+            </div>
             <Ajustes />
           </div>
         </header>
@@ -271,6 +278,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </Link>
             <Ajustes className="lg:hidden" />
           </div>
+
+          {empresa && (
+            <Link href="/empresas" className="mx-5 mb-2 block break-words rounded-lg border border-white/15 px-3 py-2 text-xs text-white hover:bg-white/10">
+              {empresa.nombre}
+              <span className="mt-1 block text-cyan-300">Cambiar empresa</span>
+            </Link>
+          )}
 
           {/* Menú de navegación Desktop */}
           <nav aria-label="Navegación principal" className="sidebar-nav mt-4 hidden flex-1 flex-col gap-1 px-3 lg:flex">

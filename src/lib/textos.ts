@@ -395,6 +395,8 @@ const es = {
     no_archivada: "Archiva la tarea antes de eliminarla.",
     archivo_tipo: "Solo se pueden subir fotos y archivos PDF.",
     archivo_grande: "El archivo pesa más de 15 MB.",
+    ocupado: "Espera a que termine la operación antes de cambiar de empresa.",
+    empresa_cambio: "Cambió la sesión o la empresa. Revisa el resultado antes de volver a intentarlo.",
     error: "Algo salió mal. Intenta de nuevo.",
   } as Record<Fallo, string>,
 };

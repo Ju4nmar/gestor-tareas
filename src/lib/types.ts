@@ -1,6 +1,9 @@
 /** El cliente solo mira el avance de su obra: no recibe tareas ni cambia nada. */
 export type Rol = "admin" | "empleado" | "cliente";
 
+/** Acceso de la cuenta a una empresa. El rol pertenece a esta membresía. */
+export type Empresa = { id: string; nombre: string; perfilId: string; rol: Rol };
+
 /** Estados de una tarea, en el orden del flujo. */
 export type Estado =
   | "borrador" // creada, sin asignar
@@ -169,4 +172,6 @@ export type Fallo =
   | "archivo"
   | "archivo_tipo"
   | "archivo_grande"
+  | "ocupado"
+  | "empresa_cambio"
   | "error";
