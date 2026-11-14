@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Ajustes, Logo, Sello, falloDe } from "@/components/ui";
-import { ESTADOS } from "@/lib/flujo";
+import { Ajustes, Logo, falloDe } from "@/components/ui";
+import { Arquitectura } from "@/components/Arquitectura";
+import { Icon } from "@/components/Icon";
 import { entrar, entrarDemo, pedirClave, salir, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Rol } from "@/lib/types";
@@ -13,7 +14,9 @@ export default function EntradaPage() {
   const { t } = useT();
   const router = useRouter();
   const [correo, setCorreo] = useState("");
+  const [visible, setVisible] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
@@ -23,7 +26,8 @@ export default function EntradaPage() {
 
   const muestra = useSearchParams().get("demo");
   useEffect(() => {
-    if (muestra === "admin" || muestra === "empleado" || muestra === "cliente") entrarDemo(muestra);
+    if (muestra === "admin" || muestra === "empleado" || muestra === "cliente")
+      entrarDemo(muestra);
   }, [muestra]);
 
   const enviar = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -43,150 +47,216 @@ export default function EntradaPage() {
 
   const olvido = async () => {
     setError("");
-    if (!/^[^@ ]+@[^@ ]+[.][^@ ]+$/.test(correo.trim())) return setAviso(t.entrada.olvidoAyuda);
-    await pedirClave(correo.trim());
-    setAviso(t.entrada.olvidoListo);
+    if (!/^[^@ ]+@[^@ ]+[.][^@ ]+$/.test(correo.trim())) {
+      setAviso(t.entrada.olvidoAyuda);
+      document.getElementById("correo")?.focus();
+      return;
+    }
+    setRecuperando(true);
+    setAviso("");
+    try {
+      await pedirClave(correo.trim());
+      setAviso(t.entrada.olvidoListo);
+    } catch (e) {
+      setError(t.fallos[falloDe(e)]);
+    } finally {
+      setRecuperando(false);
+    }
   };
 
   const demo = (rol: Rol) => {
     entrarDemo(rol);
     router.push("/panel");
   };
-
-  const [antes, despues] = t.lema.split(", ");
   const sinAcceso = listo && email && !perfil;
 
   return (
-    <div className="grid min-h-screen flex-1 lg:grid-cols-[1.1fr_0.9fr]">
-      {/* Columna Izquierda: Brand & Value Proposition */}
-      <section className="flex flex-col justify-between border-b border-slate-800 bg-slate-900 px-6 py-8 text-slate-100 sm:px-10 lg:border-b-0 lg:border-r lg:px-14 lg:py-12">
-        <div className="flex items-center">
-          <Logo className="text-2xl text-white" />
-        </div>
-
-        <div className="my-10 lg:my-0">
-          <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
-            <span className="h-2 w-2 rounded-full bg-blue-500" />
-            Control visual para obras y reformas
-          </div>
-          <h1 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.5rem)] font-extrabold leading-[1.05] tracking-tight text-white">
-            {antes},
-            <br />
-            <span className="text-blue-400">{despues}</span>
+    <main className="entrada-trazo">
+      <section
+        className="entrada-hero"
+        aria-label="TRAZO, del plano al progreso"
+      >
+        <Logo className="logo-inverso" />
+        <div className="entrada-titular">
+          <p className="lema-trazo">Del plano al progreso.</p>
+          <h1>
+            Planifica, ejecuta y<br /> controla tus obras
+            <br /> <span>en un solo lugar.</span>
           </h1>
-
-          <ol className="mt-8 max-w-md space-y-4 border-t border-slate-800 pt-6">
-            {t.entrada.puntos.map((punto, i) => (
-              <li key={punto} className="flex items-start gap-3.5 text-base text-slate-300">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 font-mono text-xs font-bold text-blue-400">
-                  {i + 1}
-                </span>
-                <span>{punto}</span>
-              </li>
-            ))}
-          </ol>
+          <p className="entrada-descripcion">
+            Cada tarea tiene un responsable.
+            <br />
+            Cada avance, un lugar en tu obra.
+          </p>
         </div>
-
-        <div className="hidden flex-wrap gap-2 text-slate-400 sm:flex">
-          {ESTADOS.filter((e) => e !== "borrador").map((estado) => (
-            <Sello key={estado} estado={estado} />
-          ))}
+        <Arquitectura />
+        <div className="entrada-beneficios">
+          <div>
+            <Icon name="tareas" />
+            <span>
+              <strong>Gestión de tareas</strong>
+              <small>Asigna, sigue y cierra actividades.</small>
+            </span>
+          </div>
+          <div>
+            <Icon name="capas" />
+            <span>
+              <strong>Control de obras</strong>
+              <small>Todos tus proyectos conectados.</small>
+            </span>
+          </div>
+          <div>
+            <Icon name="avance" />
+            <span>
+              <strong>Reportes y avance</strong>
+              <small>Decide con una visión clara.</small>
+            </span>
+          </div>
         </div>
+        <span className="ilustracion-nota">Visualización ilustrativa</span>
       </section>
 
-      {/* Columna Derecha: Login / Modo Demo */}
-      <section className="flex flex-col justify-between bg-papel px-6 py-8 sm:px-10 lg:px-14 lg:py-12">
-        <div className="flex justify-end">
+      <section className="entrada-acceso" aria-label="Acceso a tu cuenta">
+        <div className="entrada-ajustes">
           <Ajustes />
         </div>
-
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
+        <div className="entrada-tarjeta">
+          <Logo />
+          <div className="entrada-form-heading">
+            <h2>{t.entrada.titulo}</h2>
+            <p>Accede a tu cuenta para continuar</p>
+          </div>
           {sinAcceso ? (
-            <div className="rounded-2xl border border-regla bg-hoja p-6 shadow-sm">
-              <h2 className="font-display text-2xl font-bold tracking-tight text-tinta">{t.entrada.titulo}</h2>
-              <p className="mt-3 text-sm leading-relaxed text-gris">
-                {desactivada ? t.entrada.desactivada : t.entrada.sinAcceso(email ?? "")}
+            <div className="space-y-5" role="status">
+              <p className="text-sm leading-relaxed text-gris">
+                {desactivada
+                  ? t.entrada.desactivada
+                  : t.entrada.sinAcceso(email ?? "")}
               </p>
-              <button type="button" className="btn btn-linea mt-5" onClick={() => void salir()}>
+              <button
+                type="button"
+                className="btn btn-linea w-full"
+                onClick={() => void salir()}
+              >
                 {t.comun.salir}
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl border border-regla bg-hoja p-6 shadow-sm sm:p-8">
-              <h2 className="font-display text-2xl font-extrabold tracking-tight text-tinta">{t.entrada.titulo}</h2>
-              <form onSubmit={enviar} className="mt-5 space-y-4">
+            <>
+              <form
+                onSubmit={enviar}
+                className="space-y-5"
+                aria-busy={enviando}
+              >
                 <div>
                   <label className="etiqueta" htmlFor="correo">
                     {t.entrada.correo}
                   </label>
-                  <input
-                    className="campo"
-                    id="correo"
-                    type="email"
-                    autoComplete="username"
-                    required
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                  />
+                  <div className="campo-icono">
+                    <Icon name="correo" />
+                    <input
+                      className="campo"
+                      id="correo"
+                      type="email"
+                      autoComplete="username"
+                      placeholder="tu@correo.com"
+                      required
+                      value={correo}
+                      onChange={(e) => setCorreo(e.target.value)}
+                      aria-describedby={
+                        error
+                          ? "entrada-error"
+                          : aviso
+                            ? "entrada-aviso"
+                            : undefined
+                      }
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="etiqueta" htmlFor="clave">
                     {t.entrada.clave}
                   </label>
-                  <input className="campo" id="clave" name="clave" type="password" autoComplete="current-password" required />
+                  <div className="campo-icono">
+                    <Icon name="candado" />
+                    <input
+                      className="campo campo-clave"
+                      id="clave"
+                      name="clave"
+                      type={visible ? "text" : "password"}
+                      autoComplete="current-password"
+                      placeholder="Tu contraseña"
+                      required
+                      aria-describedby={error ? "entrada-error" : undefined}
+                    />
+                    <button
+                      type="button"
+                      className="mostrar-clave"
+                      aria-label={
+                        visible ? "Ocultar contraseña" : "Mostrar contraseña"
+                      }
+                      aria-pressed={visible}
+                      onClick={() => setVisible(!visible)}
+                    >
+                      <Icon name={visible ? "ocultar" : "ojo"} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="enlace text-xs"
+                    onClick={() => void olvido()}
+                    disabled={recuperando}
+                  >
+                    {recuperando ? "Enviando enlace…" : t.entrada.olvido}
+                  </button>
                 </div>
                 {error && (
-                  <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                  <p id="entrada-error" role="alert" className="mensaje-error">
                     {error}
                   </p>
                 )}
-                {aviso && <p className="text-xs text-gris">{aviso}</p>}
-                <button className="btn btn-marca w-full justify-center" disabled={enviando || !listo}>
-                  {enviando ? t.entrada.entrando : t.entrada.boton}
+                {aviso && (
+                  <p id="entrada-aviso" role="status" className="mensaje-info">
+                    {aviso}
+                  </p>
+                )}
+                <button
+                  className="btn btn-marca entrada-submit w-full"
+                  disabled={enviando || !listo}
+                >
+                  {enviando
+                    ? t.entrada.entrando
+                    : !listo
+                      ? "Preparando acceso…"
+                      : t.entrada.boton}
+                  <Icon name="flecha" />
                 </button>
               </form>
-
-              <div className="mt-4 flex items-center justify-between text-xs text-gris">
-                <button type="button" className="hover:text-tinta underline-offset-2 hover:underline" onClick={olvido}>
-                  {t.entrada.olvido}
+              <div className="demo-separador">
+                <span>{t.entrada.demo}</span>
+              </div>
+              <div className="demo-accesos">
+                <button type="button" onClick={() => demo("admin")}>
+                  <Icon name="corona" />
+                  <span>{t.entrada.demoAdmin}</span>
+                </button>
+                <button type="button" onClick={() => demo("empleado")}>
+                  <Icon name="equipo" />
+                  <span>{t.entrada.demoEmpleado}</span>
+                </button>
+                <button type="button" onClick={() => demo("cliente")}>
+                  <Icon name="casco" />
+                  <span>{t.entrada.demoCliente}</span>
                 </button>
               </div>
-
-              <div className="mt-8 border-t border-regla pt-5">
-                <span className="text-xs font-bold uppercase tracking-wider text-gris">{t.entrada.demo}</span>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className="rounded-xl border border-regla bg-papel/60 px-3 py-2 text-xs font-semibold text-tinta transition-all hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    onClick={() => demo("admin")}
-                  >
-                    {t.entrada.demoAdmin}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl border border-regla bg-papel/60 px-3 py-2 text-xs font-semibold text-tinta transition-all hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    onClick={() => demo("empleado")}
-                  >
-                    {t.entrada.demoEmpleado}
-                  </button>
-                  <button
-                    type="button"
-                    className="col-span-2 rounded-xl border border-regla bg-papel/60 px-3 py-2 text-xs font-semibold text-tinta transition-all hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    onClick={() => demo("cliente")}
-                  >
-                    {t.entrada.demoCliente}
-                  </button>
-                </div>
-                <p className="mt-2.5 text-[11px] text-gris">{t.entrada.demoNota}</p>
-              </div>
-            </div>
+              <p className="demo-nota">{t.entrada.demoNota}</p>
+            </>
           )}
         </div>
-
-        <div className="text-center text-xs text-gris">
-          <span>Relevo · Gestor de Tareas y Obras</span>
-        </div>
+        <p className="entrada-pie">TRAZO · Gestión de Obras y Tareas</p>
       </section>
-    </div>
+    </main>
   );
 }

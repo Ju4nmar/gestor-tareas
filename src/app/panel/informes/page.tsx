@@ -115,7 +115,7 @@ export default function InformesPage() {
     ];
     const csv = "\uFEFF" + filas.map((f) => f.map(celda).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const enlace = Object.assign(document.createElement("a"), { href: url, download: `relevo-${hoy}.csv` });
+    const enlace = Object.assign(document.createElement("a"), { href: url, download: `trazo-${hoy}.csv` });
     enlace.click();
     URL.revokeObjectURL(url);
   };

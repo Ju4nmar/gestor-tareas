@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
+import { Icon } from "./Icon";
+export { Logo } from "./Marca";
 import { useHoy } from "@/lib/fechas";
 import { ErrorFlujo, abierta, codigoTarea, diasInvitacion, diasRestantes, vencida } from "@/lib/flujo";
 import { useStore } from "@/lib/store";
-import { type Textos, cambiarIdioma, useT } from "@/lib/textos";
+import { type Textos, useT } from "@/lib/textos";
 import type { Estado, Evento, Fallo, Prioridad, Tarea } from "@/lib/types";
 
 /** Clave del motivo de un error, para buscar su texto en `t.fallos`. */
@@ -23,28 +25,6 @@ export async function copiarInvitacion(codigo: string, titulo: string) {
     window.prompt(titulo, enlaceInvitacion(codigo));
     return false;
   }
-}
-
-/** Nombre de la aplicación con isotipo moderno y tipografía limpia. */
-export function Logo({ className = "text-xl" }: { className?: string }) {
-  const { t } = useT();
-  return (
-    <span className={`inline-flex items-center gap-2.5 font-sans font-bold tracking-tight text-slate-900 dark:text-white ${className}`}>
-      <span
-        aria-hidden
-        className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/20"
-      >
-        <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-          <path
-            fillRule="evenodd"
-            d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </span>
-      <span>{t.marca}</span>
-    </span>
-  );
 }
 
 /** Estado de una tarea: badge moderno tipo pill con punto de color y texto nítido. */
@@ -105,7 +85,7 @@ export function Barras({ prioridad, conTexto = false }: { prioridad: Prioridad; 
           />
         ))}
       </span>
-      <span className={conTexto ? `text-xs font-semibold ${prioridad === "urgente" ? "text-red-600" : "text-gris"}` : "sr-only"}>
+      <span className={conTexto ? `text-xs font-semibold ${prioridad === "urgente" ? "text-red-700 dark:text-red-300" : "text-gris"}` : "sr-only"}>
         {t.prioridades[prioridad]}
       </span>
     </span>
@@ -264,9 +244,9 @@ export function useObras() {
 export function Avance({ hechas, total }: { hechas: number; total: number }) {
   const porcentaje = total ? Math.min(100, Math.round((hechas / total) * 100)) : 0;
   return (
-    <span className="block h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden>
+    <span className="block h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Avance de tareas completadas" aria-valuenow={porcentaje} aria-valuemin={0} aria-valuemax={100}>
       <span
-        className="block h-full rounded-full bg-emerald-500 transition-all duration-300"
+        className="block h-full rounded-full bg-exito transition-all duration-300"
         style={{ width: `${porcentaje}%` }}
       />
     </span>
@@ -344,7 +324,7 @@ export function ListaTareas({
   );
 }
 
-// --- Tema e idioma ----------------------------------------------------------
+// --- Tema ------------------------------------------------------------------
 
 const oyentesTema = new Set<() => void>();
 const temaActual = () => (document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
@@ -356,9 +336,9 @@ function subscribeTema(oyente: () => void) {
   };
 }
 
-/** Botones modernos para cambiar de idioma y de tema. */
+/** Selector de tema con preferencia persistente. */
 export function Ajustes({ className = "" }: { className?: string }) {
-  const { t, idioma } = useT();
+  const { t } = useT();
   const tema = useSyncExternalStore(subscribeTema, temaActual, () => "light");
   const alternar = () => {
     const nuevo = tema === "dark" ? "light" : "dark";
@@ -374,20 +354,13 @@ export function Ajustes({ className = "" }: { className?: string }) {
     <div className={`flex items-center gap-1.5 ${className}`}>
       <button
         type="button"
-        className="inline-flex items-center gap-1 rounded-lg border border-regla bg-hoja px-2.5 py-1 text-xs font-semibold text-tinta shadow-sm transition-all hover:bg-hoja-hover"
-        onClick={() => cambiarIdioma(idioma === "es" ? "en" : "es")}
-      >
-        <span className="text-[10px] font-bold text-blue-600">🌐</span>
-        {t.comun.idioma}
-      </button>
-      <button
-        type="button"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-regla bg-hoja px-2.5 py-1 text-xs font-semibold text-tinta shadow-sm transition-all hover:bg-hoja-hover"
+        className="tema-toggle"
         onClick={alternar}
-        aria-label={t.comun.tema}
+        aria-label={tema === "dark" ? "Activar tema claro" : "Activar tema oscuro"}
+        aria-pressed={tema === "dark"}
         title={t.comun.tema}
       >
-        {tema === "dark" ? "🌙 Dark" : "☀️ Light"}
+        <Icon name={tema === "dark" ? "luna" : "sol"} /><span>{tema === "dark" ? "Oscuro" : "Claro"}</span>
       </button>
     </div>
   );
@@ -398,6 +371,7 @@ export function Cargando() {
   return (
     <div className="flex min-h-[60vh] flex-1 items-center justify-center" role="status">
       <div className="flex flex-col items-center gap-3">
+        <span className="font-display text-xl font-bold tracking-widest text-tinta">TRAZO</span>
         <span className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
         <span className="text-xs font-medium text-gris">{t.comun.cargando}</span>
       </div>
@@ -455,7 +429,7 @@ export function Encabezado({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4">
+    <header className="page-heading flex flex-wrap items-center justify-between gap-4">
       <div>
         {rotulo && <p className="text-xs font-semibold uppercase tracking-wider text-gris">{rotulo}</p>}
         <h1 className="mt-1 font-sans text-2xl font-bold tracking-tight text-tinta sm:text-3xl">{titulo}</h1>

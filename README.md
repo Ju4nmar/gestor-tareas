@@ -1,4 +1,4 @@
-# Relevo · Gestión de tareas
+# TRAZO · Gestión de Obras y Tareas
 
 Aplicación para repartir tareas entre un administrador y su equipo, agrupadas por obra
 (un local, una casa, un apartamento). El administrador crea y asigna; cada persona acepta,
@@ -59,7 +59,7 @@ Las reglas están en `src/lib/flujo.ts` y, las que mandan, en la función `tm_ac
 - **Sin claves secretas en la aplicación.** Solo se usa la clave publicable de Supabase.
 - **Cabeceras de seguridad** en `next.config.ts` (no se puede incrustar en otros sitios, entre otras).
 - **Pensada para crecer.** Los estados y reglas viven en un solo lugar; los textos, en `src/lib/textos.ts`
-  (español e inglés); añadir un campo o un paso no obliga a tocar las pantallas una por una.
+  (interfaz en español); añadir un campo o un paso no obliga a tocar las pantallas una por una.
 
 ## Probarla
 

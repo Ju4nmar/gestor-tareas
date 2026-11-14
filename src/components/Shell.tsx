@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ESPERA_ADMIN, abierta } from "@/lib/flujo";
 import { personasDemo, recargar, salir, salirDemo, useStore, verComo } from "@/lib/store";
 import { useT } from "@/lib/textos";
@@ -14,7 +14,7 @@ function BarraDemo() {
   const { perfil } = useStore();
   const { t } = useT();
   return (
-    <div className="border-b border-slate-800 bg-slate-900 text-slate-200">
+    <div role="region" aria-label="Modo de demostración" className="border-b border-slate-800 bg-slate-900 text-slate-200">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 text-xs lg:px-8">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
@@ -25,6 +25,7 @@ function BarraDemo() {
           <label className="flex items-center gap-2 text-slate-300">
             <span className="hidden sm:inline">{t.demo.verComo}</span>
             <select
+              aria-label={t.demo.verComo}
               className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1 text-xs text-slate-100 transition-colors focus:border-blue-500 focus:outline-none"
               value={perfil?.id}
               onChange={(e) => verComo(e.target.value)}
@@ -146,6 +147,28 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Hoja modal de "Más" en móvil
   const [mas, setMas] = useState(false);
+  const menuRef = useRef<HTMLDialogElement>(null);
+  const masRef = useRef<HTMLButtonElement>(null);
+  const cerrarMenu = () => {
+    menuRef.current?.close();
+    setMas(false);
+    masRef.current?.focus();
+  };
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (mas && menu && !menu.open) menu.showModal();
+    if (!mas && menu?.open) menu.close();
+    if (!mas) return;
+    const escritorio = window.matchMedia("(min-width: 1024px)");
+    const adaptar = () => {
+      if (escritorio.matches) {
+        menu?.close();
+        setMas(false);
+      }
+    };
+    escritorio.addEventListener("change", adaptar);
+    return () => escritorio.removeEventListener("change", adaptar);
+  }, [mas]);
 
   // Sin acceso no hay panel: de vuelta a la entrada.
   useEffect(() => {
@@ -240,7 +263,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {demo && <BarraDemo />}
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* Barra lateral Desktop */}
-        <aside className="shrink-0 border-b border-regla bg-hoja lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
+        <aside className="trazo-sidebar shrink-0 border-b border-regla bg-hoja lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
           {/* Cabecera / Logo */}
           <div className="flex items-center justify-between px-5 py-4 lg:px-6 lg:pb-4 lg:pt-6">
             <Link href="/panel" aria-label={t.nav.inicio} className="transition-opacity hover:opacity-90">
@@ -250,7 +273,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Menú de navegación Desktop */}
-          <nav className="mt-4 hidden flex-1 flex-col gap-1 px-3 lg:flex">
+          <nav aria-label="Navegación principal" className="sidebar-nav mt-4 hidden flex-1 flex-col gap-1 px-3 lg:flex">
             {secciones.map((s) => {
               const active = activa(s.href);
               return (
@@ -294,15 +317,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* Tarjeta de usuario y ajustes Desktop */}
-          <div className="mt-auto hidden flex-col gap-4 border-t border-regla p-4 lg:flex">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gris">
-                {t.comun.tema} / {t.comun.idioma}
-              </span>
-              <Ajustes />
-            </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-regla bg-papel/70 p-3">
+          <div className="mt-auto hidden flex-col gap-4 border-t border-white/10 p-4 lg:flex">
+            <div className="sidebar-user flex items-center justify-between gap-3 rounded-xl border p-3">
               <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar nombre={perfil.nombre} />
                 <div className="min-w-0">
@@ -324,8 +340,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Contenido principal */}
-        <main className="min-w-0 flex-1 px-4 pb-24 pt-6 sm:px-6 sm:pb-28 sm:pt-8 lg:px-10 lg:py-8">
-          <div className="mx-auto max-w-5xl animate-entrar" key={pathname}>
+        <main id="contenido" className="trazo-main min-w-0 flex-1 px-4 pb-24 pt-6 sm:px-6 sm:pb-28 sm:pt-8 lg:px-10 lg:py-8">
+          <div className="mx-auto max-w-[1440px] animate-entrar" key={pathname}>
+            <div className="panel-toolbar"><span>{secciones.find((seccion) => activa(seccion.href))?.label}</span><Ajustes /></div>
             {aviso}
             {children}
           </div>
@@ -334,16 +351,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       {/* Modal / Menú "Más" para Celular */}
       {mas && (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs transition-opacity lg:hidden"
-          onClick={() => setMas(false)}
+        <dialog
+          ref={menuRef}
+          aria-labelledby="menu-movil-titulo"
+          className="menu-movil fixed inset-0 z-40 m-0 h-full max-h-none w-full max-w-none border-0 bg-transparent p-0 lg:hidden"
+          onCancel={cerrarMenu}
+          onClick={(event) => { if (event.target === event.currentTarget) cerrarMenu(); }}
         >
           <div
             className="absolute inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto rounded-t-3xl border-t border-regla bg-hoja p-5 shadow-2xl animate-entrar"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700" />
-            <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-gris">
+            <button type="button" autoFocus aria-label="Cerrar menú" className="btn btn-linea mb-4 w-full" onClick={cerrarMenu}>Cerrar menú</button>
+            <h2 id="menu-movil-titulo" className="mb-2 text-xs font-bold uppercase tracking-wider text-gris">
               {t.nav.mas}
             </h2>
             <div className="divide-y divide-regla">
@@ -353,7 +374,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={s.href}
                     href={s.href}
-                    onClick={() => setMas(false)}
+                    onClick={cerrarMenu}
                     aria-current={active ? "page" : undefined}
                     className={`flex min-h-[52px] items-center justify-between py-3 font-medium transition-colors ${
                       active ? "font-semibold text-blue-600 dark:text-blue-400" : "text-tinta"
@@ -382,7 +403,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {/* Barra de navegación inferior Celular (Touch-friendly 4-tabs) */}
@@ -420,7 +441,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
         <button
           type="button"
+          ref={masRef}
           aria-expanded={mas}
+          aria-haspopup="dialog"
           onClick={() => setMas((v) => !v)}
           className={`relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
             mas || enResto

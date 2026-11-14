@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ObraVisual } from "@/components/Arquitectura";
 import { useState } from "react";
 import { AccionesInvitacion, Avance, Encabezado, Seccion, VigenciaInvitacion, copiarInvitacion, falloDe } from "@/components/ui";
 import { useHoy } from "@/lib/fechas";
@@ -166,7 +167,7 @@ function Clientes({ obra, clientes }: { obra: Obra; clientes: Perfil[] }) {
               <span className="font-semibold text-tinta">{c.nombre}</span>
               <span className="text-[11px] text-gris">
                 {!c.userId ? (
-                  <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                  <span className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                     {t.comun.pendiente}
                   </span>
@@ -287,9 +288,10 @@ function Tarjeta({ obra, tareas, admin, clientes }: { obra: Obra; tareas: Tarea[
 
   return (
     <li className={`hoja flex flex-col p-5 shadow-xs transition-shadow hover:shadow-md sm:p-6 ${obra.activa ? "" : "opacity-75"}`}>
+      <ObraVisual className="obra-modulo-visual" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate font-display text-xl font-bold tracking-tight text-tinta">{obra.nombre}</h3>
+          <h2 className="truncate font-display text-xl font-bold tracking-tight text-tinta">{obra.nombre}</h2>
           {obra.detalle && <p className="mt-1 text-xs text-gris line-clamp-2">{obra.detalle}</p>}
         </div>
         {!obra.activa && (
