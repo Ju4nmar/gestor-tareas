@@ -145,7 +145,7 @@ export default function EntradaPage() {
             <>
               <form
                 onSubmit={enviar}
-                className="space-y-5"
+                className="entrada-form"
                 aria-busy={enviando}
               >
                 <div>
@@ -255,7 +255,6 @@ export default function EntradaPage() {
             </>
           )}
         </div>
-        <p className="entrada-pie">TRAZO · Gestión de Obras y Tareas</p>
       </section>
     </main>
   );
