@@ -64,20 +64,20 @@ function Tareas({
   const estados = ESTADOS.filter((e) =>
     vista === "todas" ? true : vista === "abiertas" ? e !== "completada" : e === "completada",
   );
-  // Las archivadas solo las ve el administrador: siguen el filtro de obra y van al final, las últimas primero.
+  // Las archivadas solo las ve el administrador.
   const archivadasVista = admin
     ? archivadas
         .filter((x) => !obra || (obra === SIN_OBRA ? !x.obraId : x.obraId === obra))
         .sort((a: Tarea, b: Tarea) => (b.archivada ?? "").localeCompare(a.archivada ?? ""))
     : [];
-  // Se ofrecen las obras activas y cualquier otra que tenga tareas a la vista.
+
   const conTareas = new Set(tareas.map((x) => x.obraId));
   const opciones = [
     { id: "", nombre: t.obras.todas },
     ...obras.filter((o) => o.activa || conTareas.has(o.id) || o.id === obra).map((o) => ({ id: o.id, nombre: o.nombre })),
     ...(conTareas.has(null) ? [{ id: SIN_OBRA, nombre: t.comun.sinObra }] : []),
   ];
-  // Sin obra elegida, la lista se parte por obra.
+
   const grupos = obra
     ? []
     : opciones
@@ -92,38 +92,61 @@ function Tareas({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <Encabezado rotulo={t.tareas.cuenta(lista.length)} titulo={t.tareas.titulo}>
         {admin && !creando && (
-          <button className="btn" onClick={() => setCreando(true)}>
+          <button className="btn btn-marca hidden sm:inline-flex" onClick={() => setCreando(true)}>
             + {t.tareas.nueva}
           </button>
         )}
       </Encabezado>
 
+      {/* Botón flotante FAB en móvil */}
+      {admin && !creando && (
+        <button
+          onClick={() => setCreando(true)}
+          aria-label={t.tareas.nueva}
+          className="fixed bottom-20 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition-transform active:scale-95 sm:hidden"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      )}
+
       {avisoFotos && (
-        <p role="status" className="hoja px-4 py-3 text-sm font-medium">
+        <div role="status" className="hoja border-amber-200 bg-amber-50/80 p-4 text-sm font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
           {t.tareas.avisoFotos}
-        </p>
+        </div>
       )}
 
       {creando && (
-        <TareaForm
-          obraInicial={obra && obra !== SIN_OBRA ? obra : null}
-          onCancel={() => setCreando(false)}
-          onDone={(id, sinArchivos) => router.push(`/panel/tareas/${id}${sinArchivos ? "?aviso=archivo" : ""}`)}
-        />
+        <div className="rounded-2xl border border-regla bg-hoja p-5 shadow-sm sm:p-7">
+          <TareaForm
+            obraInicial={obra && obra !== SIN_OBRA ? obra : null}
+            onCancel={() => setCreando(false)}
+            onDone={(id, sinArchivos) => router.push(`/panel/tareas/${id}${sinArchivos ? "?aviso=archivo" : ""}`)}
+          />
+        </div>
       )}
 
+      {/* Chips de selección de Obra */}
       {opciones.length > 2 && (
-        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label={t.campos.obra}>
+        <div
+          className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+          role="group"
+          aria-label={t.campos.obra}
+        >
           {opciones.map((o) => (
             <button
               key={o.id}
               aria-pressed={obra === o.id}
               onClick={() => setObra(o.id)}
-              className={`min-h-11 shrink-0 rounded-[3px] border px-4 text-sm font-medium whitespace-nowrap transition-colors ${
-                obra === o.id ? "border-tinta bg-tinta text-papel" : "border-tinta/30 hover:border-tinta"
+              className={`min-h-10 shrink-0 rounded-xl px-3.5 text-xs font-semibold whitespace-nowrap transition-all ${
+                obra === o.id
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "border border-regla bg-hoja text-slate-700 hover:border-slate-300 dark:text-slate-300"
               }`}
             >
               {o.nombre}
@@ -132,8 +155,9 @@ function Tareas({
         </div>
       )}
 
-      <div>
-        <div className="flex gap-6 overflow-x-auto border-b border-regla">
+      {/* Barra de pestañas y filtros */}
+      <div className="space-y-4">
+        <div className="flex gap-2 border-b border-regla pb-1">
           {(["abiertas", "completadas", "todas"] as Vista[]).map((v) => (
             <button
               key={v}
@@ -144,15 +168,25 @@ function Tareas({
             </button>
           ))}
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
-          <input
-            type="search"
-            className="campo col-span-2 lg:col-span-1"
-            placeholder={t.tareas.buscar}
-            aria-label={t.tareas.buscar}
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
+
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
+          <div className="relative col-span-2 lg:col-span-1">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              className="campo pl-10"
+              placeholder={t.tareas.buscar}
+              aria-label={t.tareas.buscar}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+
           <select
             className="campo"
             aria-label={t.campos.estado}
@@ -168,6 +202,7 @@ function Tareas({
               </option>
             ))}
           </select>
+
           <select
             className="campo"
             aria-label={t.campos.prioridad}
@@ -183,6 +218,7 @@ function Tareas({
               </option>
             ))}
           </select>
+
           {admin && (
             <select
               className="campo"
@@ -203,35 +239,37 @@ function Tareas({
               <option value="nadie">{t.comun.sinResponsable}</option>
             </select>
           )}
+
           {vista !== "completadas" && (
-            <label className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm whitespace-nowrap">
+            <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-regla bg-hoja px-3 text-xs font-semibold sm:col-span-1 lg:col-span-1">
               <input
                 type="checkbox"
-                className="h-5 w-5 accent-[var(--alerta)] sm:h-4 sm:w-4"
+                className="h-4 w-4 rounded-md accent-rose-600"
                 checked={soloVencidas}
                 onChange={(e) => setSoloVencidas(e.target.checked)}
               />
-              {t.tareas.soloVencidas}
+              <span className="truncate">{t.tareas.soloVencidas}</span>
             </label>
           )}
         </div>
       </div>
 
+      {/* Resultados de tareas */}
       {lista.length === 0 ? (
-        <p className="border-y border-regla py-12 text-center text-gris">{t.tareas.vacio}</p>
+        <div className="hoja p-12 text-center text-sm text-gris">{t.tareas.vacio}</div>
       ) : grupos.length > 1 ? (
-        <div className="space-y-10">
+        <div className="space-y-8">
           {grupos.map((g, i) => (
-            <section key={g.id}>
-              <h2 className="mb-3 flex items-baseline justify-between gap-3">
+            <section key={g.id} className="space-y-3">
+              <div className="flex items-baseline justify-between gap-3">
                 <button
-                  className="text-left font-display text-xl font-bold tracking-tight underline-offset-4 hover:underline"
+                  className="text-left font-display text-lg font-bold tracking-tight text-tinta hover:text-blue-600 dark:hover:text-blue-400"
                   onClick={() => setObra(g.id)}
                 >
                   {g.nombre}
                 </button>
-                <span className="font-mono text-xs text-gris">{t.tareas.cuenta(g.tareas.length)}</span>
-              </h2>
+                <span className="text-xs font-semibold text-gris">{t.tareas.cuenta(g.tareas.length)}</span>
+              </div>
               <ListaTareas tareas={g.tareas} conResponsable={admin} cabecera={i === 0} />
             </section>
           ))}
@@ -240,13 +278,14 @@ function Tareas({
         <ListaTareas tareas={lista} conResponsable={admin} conObra={!obra} />
       )}
 
+      {/* Tareas Archivadas */}
       {archivadasVista.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="flex items-baseline justify-between gap-3 font-display text-xl font-bold tracking-tight">
-            {t.tareas.archivadas}
-            <span className="font-mono text-xs font-normal text-gris">{t.tareas.cuenta(archivadasVista.length)}</span>
-          </h2>
-          <p className="text-sm text-gris">{t.tareas.archivadasAyuda}</p>
+        <section className="mt-12 space-y-3 border-t border-regla pt-8">
+          <div className="flex items-baseline justify-between gap-3 font-display text-lg font-bold tracking-tight text-tinta">
+            <span>{t.tareas.archivadas}</span>
+            <span className="text-xs font-normal text-gris">{t.tareas.cuenta(archivadasVista.length)}</span>
+          </div>
+          <p className="text-xs text-gris">{t.tareas.archivadasAyuda}</p>
           <ListaTareas tareas={archivadasVista} conResponsable conObra={!obra} />
         </section>
       )}
@@ -258,9 +297,7 @@ export default function TareasPage() {
   const params = useSearchParams();
   const estado = params.get("estado") ?? "";
   const obra = params.get("obra") ?? "";
-  // Se llega con ?aviso=fotos cuando se eliminó una tarea pero alguna de sus fotos no se pudo borrar.
   const avisoFotos = params.get("aviso") === "fotos";
   const valido = (ESTADOS as string[]).includes(estado) ? (estado as Estado) : "";
-  // La key reinicia los filtros cuando se llega con otro estado u otra obra desde el tablero.
   return <Tareas key={`${valido}-${obra}`} estadoInicial={valido} obraInicial={obra} avisoFotos={avisoFotos} />;
 }

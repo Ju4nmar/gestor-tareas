@@ -17,12 +17,10 @@ export default function EntradaPage() {
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
-  // Con acceso, directo al panel.
   useEffect(() => {
     if (listo && perfil) router.replace("/panel");
   }, [listo, perfil, router]);
 
-  // Un enlace con ?demo=admin, ?demo=empleado o ?demo=cliente abre la muestra sin pasar por esta página.
   const muestra = useSearchParams().get("demo");
   useEffect(() => {
     if (muestra === "admin" || muestra === "empleado" || muestra === "cliente") entrarDemo(muestra);
@@ -55,53 +53,68 @@ export default function EntradaPage() {
     router.push("/panel");
   };
 
-  // "Quién hace qué, y para cuándo." → la segunda mitad va resaltada.
   const [antes, despues] = t.lema.split(", ");
   const sinAcceso = listo && email && !perfil;
 
   return (
-    <div className="grid flex-1 lg:grid-cols-[1.05fr_0.95fr]">
-      <section className="flex flex-col justify-between gap-12 bg-tinta px-6 py-8 text-papel sm:px-10 lg:px-14 lg:py-12">
-        <Logo className="text-3xl" />
-        <div>
-          <h1 className="font-display text-[clamp(2.6rem,6.4vw,5.2rem)] font-extrabold leading-[0.95] tracking-tight">
+    <div className="grid min-h-screen flex-1 lg:grid-cols-[1.1fr_0.9fr]">
+      {/* Columna Izquierda: Brand & Value Proposition */}
+      <section className="flex flex-col justify-between border-b border-slate-800 bg-slate-900 px-6 py-8 text-slate-100 sm:px-10 lg:border-b-0 lg:border-r lg:px-14 lg:py-12">
+        <div className="flex items-center">
+          <Logo className="text-2xl text-white" />
+        </div>
+
+        <div className="my-10 lg:my-0">
+          <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-400">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            Control visual para obras y reformas
+          </div>
+          <h1 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.5rem)] font-extrabold leading-[1.05] tracking-tight text-white">
             {antes},
             <br />
-            <span className="resaltado">{despues}</span>
+            <span className="text-blue-400">{despues}</span>
           </h1>
-          <ol className="mt-10 max-w-md space-y-3 border-t border-papel/20 pt-6">
+
+          <ol className="mt-8 max-w-md space-y-4 border-t border-slate-800 pt-6">
             {t.entrada.puntos.map((punto, i) => (
-              <li key={punto} className="flex gap-4 text-lg text-papel/85">
-                <span className="mt-1 font-mono text-xs text-papel/50">0{i + 1}</span>
-                {punto}
+              <li key={punto} className="flex items-start gap-3.5 text-base text-slate-300">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 font-mono text-xs font-bold text-blue-400">
+                  {i + 1}
+                </span>
+                <span>{punto}</span>
               </li>
             ))}
           </ol>
         </div>
-        <div className="hidden flex-wrap gap-x-5 gap-y-2 text-papel/70 sm:flex">
+
+        <div className="hidden flex-wrap gap-2 text-slate-400 sm:flex">
           {ESTADOS.filter((e) => e !== "borrador").map((estado) => (
             <Sello key={estado} estado={estado} />
           ))}
         </div>
       </section>
 
-      <section className="flex flex-col px-6 py-8 sm:px-10 lg:px-14 lg:py-12">
-        <Ajustes className="justify-end" />
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
+      {/* Columna Derecha: Login / Modo Demo */}
+      <section className="flex flex-col justify-between bg-papel px-6 py-8 sm:px-10 lg:px-14 lg:py-12">
+        <div className="flex justify-end">
+          <Ajustes />
+        </div>
+
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
           {sinAcceso ? (
-            <div>
-              <h2 className="font-display text-3xl font-bold tracking-tight">{t.entrada.titulo}</h2>
-              <p className="mt-4 leading-relaxed">
+            <div className="rounded-2xl border border-regla bg-hoja p-6 shadow-sm">
+              <h2 className="font-display text-2xl font-bold tracking-tight text-tinta">{t.entrada.titulo}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-gris">
                 {desactivada ? t.entrada.desactivada : t.entrada.sinAcceso(email ?? "")}
               </p>
-              <button type="button" className="btn btn-linea mt-6" onClick={() => void salir()}>
+              <button type="button" className="btn btn-linea mt-5" onClick={() => void salir()}>
                 {t.comun.salir}
               </button>
             </div>
           ) : (
-            <>
-              <h2 className="font-display text-3xl font-bold tracking-tight">{t.entrada.titulo}</h2>
-              <form onSubmit={enviar} className="mt-6 space-y-4">
+            <div className="rounded-2xl border border-regla bg-hoja p-6 shadow-sm sm:p-8">
+              <h2 className="font-display text-2xl font-extrabold tracking-tight text-tinta">{t.entrada.titulo}</h2>
+              <form onSubmit={enviar} className="mt-5 space-y-4">
                 <div>
                   <label className="etiqueta" htmlFor="correo">
                     {t.entrada.correo}
@@ -123,37 +136,55 @@ export default function EntradaPage() {
                   <input className="campo" id="clave" name="clave" type="password" autoComplete="current-password" required />
                 </div>
                 {error && (
-                  <p role="alert" className="text-sm font-medium text-alerta">
+                  <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
                     {error}
                   </p>
                 )}
-                {aviso && <p className="text-sm text-gris">{aviso}</p>}
-                <button className="btn w-full" disabled={enviando || !listo}>
+                {aviso && <p className="text-xs text-gris">{aviso}</p>}
+                <button className="btn btn-marca w-full justify-center" disabled={enviando || !listo}>
                   {enviando ? t.entrada.entrando : t.entrada.boton}
                 </button>
               </form>
-              <button type="button" className="enlace mt-4 self-start text-sm text-gris hover:text-tinta" onClick={olvido}>
-                {t.entrada.olvido}
-              </button>
-              <p className="mt-2 text-sm text-gris">{t.entrada.invitado}</p>
 
-              <div className="mt-10 border-t border-tinta pt-5">
-                <p className="rotulo">{t.entrada.demo}</p>
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button type="button" className="btn btn-linea" onClick={() => demo("admin")}>
+              <div className="mt-4 flex items-center justify-between text-xs text-gris">
+                <button type="button" className="hover:text-tinta underline-offset-2 hover:underline" onClick={olvido}>
+                  {t.entrada.olvido}
+                </button>
+              </div>
+
+              <div className="mt-8 border-t border-regla pt-5">
+                <span className="text-xs font-bold uppercase tracking-wider text-gris">{t.entrada.demo}</span>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-regla bg-papel/60 px-3 py-2 text-xs font-semibold text-tinta transition-all hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => demo("admin")}
+                  >
                     {t.entrada.demoAdmin}
                   </button>
-                  <button type="button" className="btn btn-linea" onClick={() => demo("empleado")}>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-regla bg-papel/60 px-3 py-2 text-xs font-semibold text-tinta transition-all hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => demo("empleado")}
+                  >
                     {t.entrada.demoEmpleado}
                   </button>
-                  <button type="button" className="btn btn-linea sm:col-span-2" onClick={() => demo("cliente")}>
+                  <button
+                    type="button"
+                    className="col-span-2 rounded-xl border border-regla bg-papel/60 px-3 py-2 text-xs font-semibold text-tinta transition-all hover:border-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => demo("cliente")}
+                  >
                     {t.entrada.demoCliente}
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-gris">{t.entrada.demoNota}</p>
+                <p className="mt-2.5 text-[11px] text-gris">{t.entrada.demoNota}</p>
               </div>
-            </>
+            </div>
           )}
+        </div>
+
+        <div className="text-center text-xs text-gris">
+          <span>Relevo · Gestor de Tareas y Obras</span>
         </div>
       </section>
     </div>

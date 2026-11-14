@@ -25,21 +25,32 @@ export async function copiarInvitacion(codigo: string, titulo: string) {
   }
 }
 
-/** Nombre de la aplicación, con su punto de resaltador. */
-export function Logo({ className = "text-2xl" }: { className?: string }) {
+/** Nombre de la aplicación con isotipo moderno y tipografía limpia. */
+export function Logo({ className = "text-xl" }: { className?: string }) {
   const { t } = useT();
   return (
-    <span className={`inline-flex items-baseline font-display font-extrabold lowercase tracking-tight ${className}`}>
-      {t.marca}
-      <span aria-hidden className="ml-[0.08em] inline-block h-[0.24em] w-[0.24em] bg-marca" />
+    <span className={`inline-flex items-center gap-2.5 font-sans font-bold tracking-tight text-slate-900 dark:text-white ${className}`}>
+      <span
+        aria-hidden
+        className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+          <path
+            fillRule="evenodd"
+            d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </span>
+      <span>{t.marca}</span>
     </span>
   );
 }
 
-/** Estado de una tarea: un cuadro de su color y el nombre, con variante simple o badge. */
+/** Estado de una tarea: badge moderno tipo pill con punto de color y texto nítido. */
 export function Sello({
   estado,
-  variante = "simple",
+  variante = "badge",
   className = "",
 }: {
   estado: Estado;
@@ -50,65 +61,88 @@ export function Sello({
   const esBadge = variante === "badge";
   return (
     <span
-      className={`inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.07em] whitespace-nowrap ${
-        esBadge ? "rounded-[3px] border px-2 py-0.5" : ""
-      } ${className}`}
-      style={
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium transition-all ${
         esBadge
-          ? {
-              backgroundColor: `var(--e-${estado}-fondo)`,
-              borderColor: `var(--e-${estado}-borde)`,
-              color: `var(--tinta)`,
-            }
-          : undefined
-      }
+          ? "rounded-full border px-2.5 py-0.5 shadow-sm"
+          : "font-mono text-[11px] uppercase tracking-wider"
+      } ${className}`}
+      style={{
+        backgroundColor: esBadge ? `var(--e-${estado}-fondo)` : "transparent",
+        borderColor: esBadge ? `var(--e-${estado}-borde)` : "transparent",
+        color: `var(--tinta)`,
+      }}
     >
-      <span aria-hidden className="h-2 w-2 shrink-0 rounded-[1px]" style={{ background: `var(--e-${estado})` }} />
+      <span
+        aria-hidden
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ background: `var(--e-${estado})` }}
+      />
       {t.estados[estado]}
     </span>
   );
 }
 
 const NIVEL: Record<Prioridad, number> = { baja: 1, media: 2, alta: 3, urgente: 4 };
+const COLOR_PRIORIDAD: Record<Prioridad, string> = {
+  baja: "bg-slate-400",
+  media: "bg-blue-500",
+  alta: "bg-amber-500",
+  urgente: "bg-red-500",
+};
 
-/** Prioridad como cuatro barras que se van llenando. */
+/** Prioridad como cuatro barras modernas redondeadas. */
 export function Barras({ prioridad, conTexto = false }: { prioridad: Prioridad; conTexto?: boolean }) {
   const { t } = useT();
-  const color = prioridad === "urgente" ? "bg-alerta" : "bg-tinta";
+  const color = COLOR_PRIORIDAD[prioridad];
   return (
     <span className="inline-flex items-center gap-2" title={`${t.campos.prioridad}: ${t.prioridades[prioridad]}`}>
-      <span aria-hidden className="flex items-end gap-[2px]">
+      <span aria-hidden className="flex items-end gap-1">
         {[1, 2, 3, 4].map((n) => (
           <span
             key={n}
-            className={`w-[3px] ${n <= NIVEL[prioridad] ? color : "bg-regla"}`}
-            style={{ height: 3 + n * 3 }}
+            className={`w-1 rounded-full transition-colors ${n <= NIVEL[prioridad] ? color : "bg-slate-200 dark:bg-slate-700"}`}
+            style={{ height: 4 + n * 2.5 }}
           />
         ))}
       </span>
-      <span className={conTexto ? `text-sm ${prioridad === "urgente" ? "font-semibold text-alerta" : ""}` : "sr-only"}>
+      <span className={conTexto ? `text-xs font-semibold ${prioridad === "urgente" ? "text-red-600" : "text-gris"}` : "sr-only"}>
         {t.prioridades[prioridad]}
       </span>
     </span>
   );
 }
 
-/** Fecha límite con lo que falta: "15 oct · en 3 días", en rojo si ya pasó. */
+/** Fecha límite con formato humano y badge sutil según urgencia. */
 export function Vence({ tarea, className = "" }: { tarea: Tarea; className?: string }) {
   const { t, dia } = useT();
   const hoy = useHoy();
-  if (!tarea.vence) return <span className={`font-mono text-xs text-gris ${className}`}>{t.comun.sinFecha}</span>;
+  if (!tarea.vence) return <span className={`text-xs text-gris ${className}`}>{t.comun.sinFecha}</span>;
   const dias = diasRestantes(tarea, hoy);
   const fecha = dia(tarea.vence);
   if (!abierta(tarea) || dias === null || dias > 7) {
-    return <span className={`font-mono text-xs whitespace-nowrap text-gris ${className}`}>{fecha}</span>;
+    return <span className={`text-xs whitespace-nowrap text-gris ${className}`}>{fecha}</span>;
   }
   const { fechas } = t;
   const falta =
     dias === 0 ? fechas.hoy : dias === 1 ? fechas.manana : dias > 1 ? fechas.en(dias) : dias === -1 ? fechas.ayer : fechas.hace(-dias);
+  
+  if (dias < 0) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 border border-red-200 dark:bg-red-950/60 dark:text-red-300 dark:border-red-900/40 ${className}`}>
+        {fecha} · {falta}
+      </span>
+    );
+  }
+  if (dias === 0) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-900/40 ${className}`}>
+        {fecha} · {falta}
+      </span>
+    );
+  }
   return (
-    <span className={`font-mono text-xs whitespace-nowrap ${dias < 0 ? "font-medium text-alerta" : ""} ${className}`}>
-      {fecha} · {dias === 0 ? <span className="resaltado">{falta}</span> : falta}
+    <span className={`text-xs whitespace-nowrap text-gris ${className}`}>
+      {fecha} · {falta}
     </span>
   );
 }
@@ -120,15 +154,17 @@ export function VigenciaInvitacion({ vence }: { vence: string | null }) {
   const dias = diasInvitacion(vence, hoy);
   if (dias === null) return null;
   return dias < 0 ? (
-    <span className="font-medium text-alerta">{t.equipo.invitacionVencida}</span>
+    <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-950/60 dark:text-red-300">
+      {t.equipo.invitacionVencida}
+    </span>
   ) : (
-    <span>{t.equipo.invitacionVence(dias)}</span>
+    <span className="text-xs text-gris">{t.equipo.invitacionVence(dias)}</span>
   );
 }
 
 type InvitacionPendiente = { id: string; codigo: string | null; invitacionVence: string | null };
 
-/** Acciones disponibles para un enlace pendiente, ocultando copiar cuando ya venció. */
+/** Acciones disponibles para un enlace pendiente, con botones modernos. */
 export function AccionesInvitacion({ perfil, copiado, onCopiar, onRenovar }: {
   perfil: InvitacionPendiente;
   copiado: string;
@@ -140,16 +176,48 @@ export function AccionesInvitacion({ perfil, copiado, onCopiar, onRenovar }: {
   const dias = diasInvitacion(perfil.invitacionVence, hoy);
   const vencida = dias !== null && dias < 0;
   return (
-    <>
+    <div className="flex items-center gap-2">
       {perfil.codigo && !vencida && (
-        <button className="enlace py-1 font-medium" onClick={() => onCopiar(perfil.codigo!)}>
-          {copiado === perfil.codigo ? t.equipo.copiado : t.equipo.enlace}
+        <button
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold shadow-sm transition-all ${
+            copiado === perfil.codigo
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+          }`}
+          onClick={() => onCopiar(perfil.codigo!)}
+        >
+          {copiado === perfil.codigo ? (
+            <>
+              <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+              </svg>
+              {t.equipo.copiado}
+            </>
+          ) : (
+            <>
+              <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5 text-slate-500">
+                <path d="M11 2.5a1.5 1.5 0 0 0-1.5-1.5h-5A1.5 1.5 0 0 0 3 2.5v7A1.5 1.5 0 0 0 4.5 11h5a1.5 1.5 0 0 0 1.5-1.5v-7Z" />
+                <path d="M13 5.5a1.5 1.5 0 0 0-1.5-1.5h-.5v5.5a2.5 2.5 0 0 1-2.5 2.5H4v.5A1.5 1.5 0 0 0 5.5 14h5a1.5 1.5 0 0 0 1.5-1.5v-7Z" />
+              </svg>
+              {t.equipo.enlace}
+            </>
+          )}
         </button>
       )}
-      <button className={`enlace py-1 ${vencida ? "font-medium" : "text-gris hover:text-tinta"}`} onClick={() => onRenovar(perfil.id)}>
+      <button
+        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+          vencida
+            ? "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+        }`}
+        onClick={() => onRenovar(perfil.id)}
+      >
+        <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+          <path fillRule="evenodd" d="M13.836 2.477a.75.75 0 0 1 .75.75v3.182a.75.75 0 0 1-.75.75h-3.182a.75.75 0 0 1 0-1.5h1.37l-.84-.841a4.5 4.5 0 0 0-7.08.932.75.75 0 0 1-1.3-.75 6 6 0 0 1 9.44-1.242l.842.84V3.227a.75.75 0 0 1 .75-.75Zm-.911 7.5A.75.75 0 0 1 14 10.727a6 6 0 0 1-9.44 1.242l-.842-.84v1.644a.75.75 0 0 1-1.5 0V9.59a.75.75 0 0 1 .75-.75h3.182a.75.75 0 0 1 0 1.5H4.78l.841.841a4.5 4.5 0 0 0 7.08-.932.75.75 0 0 1 1.025-.272Z" clipRule="evenodd" />
+        </svg>
         {t.equipo.renovar}
       </button>
-    </>
+    </div>
   );
 }
 
@@ -192,18 +260,22 @@ export function useObras() {
   return (id: string | null) => obras.find((o) => o.id === id)?.nombre ?? t.comun.sinObra;
 }
 
-/** Avance de una obra: barra con las tareas completadas sobre el total. */
+/** Avance de una obra: barra redondeada moderna y limpia. */
 export function Avance({ hechas, total }: { hechas: number; total: number }) {
+  const porcentaje = total ? Math.min(100, Math.round((hechas / total) * 100)) : 0;
   return (
-    <span className="block h-2.5 w-full bg-regla" aria-hidden>
-      <span className="block h-full bg-[var(--e-completada)]" style={{ width: `${total ? (hechas / total) * 100 : 0}%` }} />
+    <span className="block h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden>
+      <span
+        className="block h-full rounded-full bg-emerald-500 transition-all duration-300"
+        style={{ width: `${porcentaje}%` }}
+      />
     </span>
   );
 }
 
-const COLUMNAS = "lg:grid-cols-[4.5rem_minmax(0,1fr)_9rem_10.5rem_2rem_12.5rem]";
+const COLUMNAS = "lg:grid-cols-[4.5rem_minmax(0,1fr)_9rem_10.5rem_2rem_11.5rem]";
 
-/** Lista de tareas con reglas: tabla en pantallas anchas, filas apiladas en el celular. */
+/** Lista de tareas moderna: tabla limpia en desktop, tarjetas táctiles en móvil. */
 export function ListaTareas({
   tareas,
   conResponsable = false,
@@ -221,52 +293,53 @@ export function ListaTareas({
   const nombre = useNombres();
   const obra = useObras();
   return (
-    <div className="border-t border-tinta">
-      <div className={`hidden gap-4 border-b border-regla py-2 ${cabecera ? "lg:grid" : ""} ${COLUMNAS}`}>
-        <span className="rotulo">{t.campos.codigo}</span>
-        <span className="rotulo">{t.campos.tarea}</span>
-        <span className="rotulo">{conResponsable ? t.campos.responsable : ""}</span>
-        <span className="rotulo">{t.campos.estado}</span>
-        {/* La columna de prioridad no lleva título visible, pero ocupa su lugar en la cuadrícula. */}
+    <div className="overflow-hidden rounded-2xl border border-regla bg-hoja shadow-sm">
+      <div className={`hidden gap-4 border-b border-regla bg-slate-50/70 px-4 py-2.5 text-xs font-semibold text-gris dark:bg-slate-900/50 ${cabecera ? "lg:grid" : ""} ${COLUMNAS}`}>
+        <span>{t.campos.codigo}</span>
+        <span>{t.campos.tarea}</span>
+        <span>{conResponsable ? t.campos.responsable : ""}</span>
+        <span>{t.campos.estado}</span>
         <span>
           <span className="sr-only">{t.campos.prioridad}</span>
         </span>
-        <span className="rotulo text-right whitespace-nowrap">{t.campos.vence}</span>
+        <span className="text-right whitespace-nowrap">{t.campos.vence}</span>
       </div>
-      {tareas.map((tarea) => (
-        <Link
-          key={tarea.id}
-          href={`/panel/tareas/${tarea.id}`}
-          className={`group grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 border-b border-regla py-3.5 transition-colors hover:bg-hoja lg:gap-4 lg:px-0 ${COLUMNAS}`}
-        >
-          <span className="order-1 font-mono text-xs text-gris lg:order-none">{codigoTarea(tarea.numero)}</span>
-          <span className="order-3 col-span-2 min-w-0 lg:order-none lg:col-span-1">
-            <span className="block font-medium underline-offset-4 group-hover:underline lg:truncate">{tarea.titulo}</span>
-            {(conObra || conResponsable) && (
-              <span className={`block truncate text-sm text-gris ${conObra ? "" : "lg:hidden"}`}>
-                {conObra && obra(tarea.obraId)}
-                {conResponsable && (
-                  <span className="lg:hidden">
-                    {conObra && " · "}
-                    {nombre(tarea.asignadaA)}
-                  </span>
-                )}
-              </span>
-            )}
-          </span>
-          <span className="hidden truncate text-sm text-gris lg:block">{conResponsable && nombre(tarea.asignadaA)}</span>
-          <span className="order-2 justify-self-end lg:order-none lg:justify-self-start">
-            <Sello estado={tarea.estado} />
-          </span>
-          <span className="order-5 justify-self-end lg:order-none lg:justify-self-start">
-            <Barras prioridad={tarea.prioridad} />
-          </span>
-          <span className="order-4 lg:order-none lg:text-right">
-            <Vence tarea={tarea} />
-            {vencida(tarea, hoy) && <span className="sr-only"> · {t.vencida}</span>}
-          </span>
-        </Link>
-      ))}
+      <div className="divide-y divide-regla">
+        {tareas.map((tarea) => (
+          <Link
+            key={tarea.id}
+            href={`/panel/tareas/${tarea.id}`}
+            className={`group grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 p-4 transition-all hover:bg-hoja-hover sm:px-5 lg:gap-4 lg:py-3.5 ${COLUMNAS}`}
+          >
+            <span className="order-1 font-mono text-xs font-medium text-gris lg:order-none">{codigoTarea(tarea.numero)}</span>
+            <span className="order-3 col-span-2 min-w-0 lg:order-none lg:col-span-1">
+              <span className="block font-semibold text-tinta group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors lg:truncate">{tarea.titulo}</span>
+              {(conObra || conResponsable) && (
+                <span className={`block truncate text-xs text-gris mt-0.5 ${conObra ? "" : "lg:hidden"}`}>
+                  {conObra && obra(tarea.obraId)}
+                  {conResponsable && (
+                    <span className="lg:hidden">
+                      {conObra && " · "}
+                      {nombre(tarea.asignadaA)}
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+            <span className="hidden truncate text-xs font-medium text-gris lg:block">{conResponsable && nombre(tarea.asignadaA)}</span>
+            <span className="order-2 justify-self-end lg:order-none lg:justify-self-start">
+              <Sello estado={tarea.estado} />
+            </span>
+            <span className="order-5 justify-self-end lg:order-none lg:justify-self-start">
+              <Barras prioridad={tarea.prioridad} />
+            </span>
+            <span className="order-4 lg:order-none lg:text-right">
+              <Vence tarea={tarea} />
+              {vencida(tarea, hoy) && <span className="sr-only"> · {t.vencida}</span>}
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
@@ -283,7 +356,7 @@ function subscribeTema(oyente: () => void) {
   };
 }
 
-/** Botones pequeños para cambiar de idioma y de tema. */
+/** Botones modernos para cambiar de idioma y de tema. */
 export function Ajustes({ className = "" }: { className?: string }) {
   const { t, idioma } = useT();
   const tema = useSyncExternalStore(subscribeTema, temaActual, () => "light");
@@ -297,15 +370,24 @@ export function Ajustes({ className = "" }: { className?: string }) {
     }
     oyentesTema.forEach((o) => o());
   };
-  const boton = "font-mono text-[11px] uppercase tracking-[0.09em] text-gris transition-colors hover:text-tinta";
   return (
-    <div className={`flex items-center gap-4 ${className}`}>
-      <button type="button" className={boton} onClick={() => cambiarIdioma(idioma === "es" ? "en" : "es")}>
+    <div className={`flex items-center gap-1.5 ${className}`}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 rounded-lg border border-regla bg-hoja px-2.5 py-1 text-xs font-semibold text-tinta shadow-sm transition-all hover:bg-hoja-hover"
+        onClick={() => cambiarIdioma(idioma === "es" ? "en" : "es")}
+      >
+        <span className="text-[10px] font-bold text-blue-600">🌐</span>
         {t.comun.idioma}
       </button>
-      <button type="button" className={boton} onClick={alternar} aria-label={t.comun.tema} title={t.comun.tema}>
-        <span aria-hidden className="mr-1.5 inline-block h-2 w-2 translate-y-[-1px] rounded-full border border-current bg-[linear-gradient(90deg,currentColor_50%,transparent_50%)]" />
-        {tema === "dark" ? "Dark" : "Light"}
+      <button
+        type="button"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-regla bg-hoja px-2.5 py-1 text-xs font-semibold text-tinta shadow-sm transition-all hover:bg-hoja-hover"
+        onClick={alternar}
+        aria-label={t.comun.tema}
+        title={t.comun.tema}
+      >
+        {tema === "dark" ? "🌙 Dark" : "☀️ Light"}
       </button>
     </div>
   );
@@ -315,12 +397,15 @@ export function Cargando() {
   const { t } = useT();
   return (
     <div className="flex min-h-[60vh] flex-1 items-center justify-center" role="status">
-      <span className="rotulo animate-pulse">{t.comun.cargando}</span>
+      <div className="flex flex-col items-center gap-3">
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        <span className="text-xs font-medium text-gris">{t.comun.cargando}</span>
+      </div>
     </div>
   );
 }
 
-/** Lista corta de tareas para los tableros: dos líneas por tarea. */
+/** Lista corta de tareas para los tableros: tarjetas limpias y modernas. */
 export function Renglones({
   tareas,
   vacio,
@@ -332,34 +417,34 @@ export function Renglones({
 }) {
   const nombre = useNombres();
   const obra = useObras();
-  if (tareas.length === 0) return <p className="border-t border-regla py-4 text-sm text-gris">{vacio}</p>;
+  if (tareas.length === 0) return <p className="rounded-xl border border-dashed border-regla p-6 text-center text-sm text-gris">{vacio}</p>;
   return (
-    <ul className="border-t border-regla">
+    <div className="grid grid-cols-1 gap-2.5">
       {tareas.map((tarea) => (
-        <li key={tarea.id} className="border-b border-regla">
-          <Link href={`/panel/tareas/${tarea.id}`} className="group block py-3.5 sm:flex sm:items-start sm:justify-between sm:gap-4 sm:py-3">
-            <span className="block min-w-0">
-              <span className="block font-medium underline-offset-4 group-hover:underline sm:truncate">{tarea.titulo}</span>
-              <span className="mt-0.5 flex items-center gap-2 text-sm text-gris">
-                <span className="shrink-0 font-mono text-xs whitespace-nowrap">{codigoTarea(tarea.numero)}</span>
-                <span className="truncate">
-                  · {obra(tarea.obraId)}
-                  {conResponsable && ` · ${nombre(tarea.asignadaA)}`}
-                </span>
-              </span>
-            </span>
-            <span className="mt-2 flex items-center justify-between gap-3 sm:mt-0 sm:shrink-0 sm:flex-col sm:items-end sm:gap-1.5 sm:pt-0.5">
-              <Sello estado={tarea.estado} />
-              <Vence tarea={tarea} />
-            </span>
-          </Link>
-        </li>
+        <Link
+          key={tarea.id}
+          href={`/panel/tareas/${tarea.id}`}
+          className="group block rounded-xl border border-regla bg-hoja p-3.5 shadow-sm transition-all hover:border-blue-200 hover:shadow-md dark:hover:border-blue-900 sm:flex sm:items-center sm:justify-between sm:gap-4"
+        >
+          <div className="min-w-0">
+            <p className="font-semibold text-tinta group-hover:text-blue-600 transition-colors sm:truncate">{tarea.titulo}</p>
+            <p className="mt-1 flex items-center gap-2 text-xs text-gris">
+              <span className="font-mono font-medium">{codigoTarea(tarea.numero)}</span>
+              <span>·</span>
+              <span className="truncate">{obra(tarea.obraId)}{conResponsable && ` · ${nombre(tarea.asignadaA)}`}</span>
+            </p>
+          </div>
+          <div className="mt-2.5 flex items-center justify-between gap-3 sm:mt-0 sm:shrink-0 sm:flex-col sm:items-end sm:gap-1.5">
+            <Sello estado={tarea.estado} />
+            <Vence tarea={tarea} />
+          </div>
+        </Link>
       ))}
-    </ul>
+    </div>
   );
 }
 
-/** Encabezado de página: una línea pequeña arriba y el título grande. */
+/** Encabezado de página moderno con jerarquía limpia. */
 export function Encabezado({
   rotulo,
   titulo,
@@ -370,24 +455,30 @@ export function Encabezado({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4">
+    <header className="flex flex-wrap items-center justify-between gap-4">
       <div>
-        {rotulo && <p className="rotulo first-letter:uppercase">{rotulo}</p>}
-        <h1 className="mt-1 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">{titulo}</h1>
+        {rotulo && <p className="text-xs font-semibold uppercase tracking-wider text-gris">{rotulo}</p>}
+        <h1 className="mt-1 font-sans text-2xl font-bold tracking-tight text-tinta sm:text-3xl">{titulo}</h1>
       </div>
-      {children}
+      {children && <div className="flex items-center gap-3">{children}</div>}
     </header>
   );
 }
 
-/** Título de una sección dentro de una página. */
+/** Título de una sección dentro de una página con badge de conteo. */
 export function Seccion({ titulo, cuenta, children }: { titulo: string; cuenta?: number; children: React.ReactNode }) {
   return (
-    <section>
-      <h2 className="mb-3 flex items-baseline gap-3 font-display text-xl font-bold tracking-tight">
-        {titulo}
-        {cuenta !== undefined && cuenta > 0 && <span className="font-mono text-xs font-normal text-gris">{cuenta}</span>}
-      </h2>
+    <section className="space-y-3.5">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-base font-bold text-tinta sm:text-lg">
+          {titulo}
+          {cuenta !== undefined && cuenta > 0 && (
+            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              {cuenta}
+            </span>
+          )}
+        </h2>
+      </div>
       {children}
     </section>
   );

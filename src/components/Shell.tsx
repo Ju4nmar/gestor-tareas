@@ -9,29 +9,39 @@ import { useT } from "@/lib/textos";
 import { VistaCliente } from "./Cliente";
 import { Ajustes, Cargando, Logo } from "./ui";
 
-/** Franja del modo de muestra: avisa que nada se guarda y deja cambiar de persona. */
+/** Franja del modo de muestra: moderna y discreta con selector rápido. */
 function BarraDemo() {
   const { perfil } = useStore();
   const { t } = useT();
   return (
-    <div className="bg-[#16130e] text-[#f2eee5]">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.08em] lg:px-6">
-        <span className="text-marca">{t.demo.aviso}</span>
-        <label className="flex items-center gap-2">
-          {t.demo.verComo}
-          <select
-            className="rounded-[3px] border border-white/30 bg-[#16130e] px-2 py-1 font-sans text-xs normal-case tracking-normal text-[#f2eee5]"
-            value={perfil?.id}
-            onChange={(e) => verComo(e.target.value)}
-          >
-            {personasDemo().map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre} · {t.roles[p.rol]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" className="ml-auto underline underline-offset-4 hover:text-marca" onClick={salirDemo}>
+    <div className="border-b border-slate-800 bg-slate-900 text-slate-200">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 text-xs lg:px-8">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+            {t.demo.aviso}
+          </span>
+          <span className="hidden text-slate-400 sm:inline">·</span>
+          <label className="flex items-center gap-2 text-slate-300">
+            <span className="hidden sm:inline">{t.demo.verComo}</span>
+            <select
+              className="rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1 text-xs text-slate-100 transition-colors focus:border-blue-500 focus:outline-none"
+              value={perfil?.id}
+              onChange={(e) => verComo(e.target.value)}
+            >
+              {personasDemo().map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre} ({t.roles[p.rol]})
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <button
+          type="button"
+          className="rounded-md px-2.5 py-1 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
+          onClick={salirDemo}
+        >
           {t.demo.salir}
         </button>
       </div>
@@ -39,29 +49,92 @@ function BarraDemo() {
   );
 }
 
-/** Dibujos del menú inferior del celular. */
+/** Iconografía SVG moderna y uniforme para la navegación. */
 const ICONOS: Record<string, React.ReactNode> = {
-  inicio: <path d="M4 11.5 12 4l8 7.5V20h-5.5v-5.5h-5V20H4v-8.5Z" />,
+  inicio: (
+    <>
+      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </>
+  ),
   tareas: (
     <>
-      <path d="M9 6h11M9 12h11M9 18h11" />
-      <path d="m3.5 6 1.2 1.2L6.8 5M3.5 12l1.2 1.2L6.8 11M3.5 18l1.2 1.2L6.8 17" />
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </>
   ),
   obras: (
     <>
-      <path d="M4 20V9l6-4v15M10 20V11h10v9M2.5 20h19" />
-      <path d="M13.5 14.5h3M13.5 17.5h3M6.5 12v0M6.5 15.5v0" />
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </>
   ),
-  mas: <path d="M5 12h.01M12 12h.01M19 12h.01" strokeWidth="3" />,
+  historial: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+  informes: (
+    <>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </>
+  ),
+  equipo: (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </>
+  ),
+  mas: (
+    <>
+      <circle cx="12" cy="12" r="1.5" />
+      <circle cx="19" cy="12" r="1.5" />
+      <circle cx="5" cy="12" r="1.5" />
+    </>
+  ),
+  salir: (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </>
+  ),
 };
 
-function Icono({ nombre }: { nombre: string }) {
+function Icono({ nombre, className = "h-5 w-5" }: { nombre: string; className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       {ICONOS[nombre]}
     </svg>
+  );
+}
+
+/** Iniciales para avatar de usuario. */
+function Avatar({ nombre }: { nombre: string }) {
+  const iniciales = nombre
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join("");
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 font-sans text-xs font-bold text-blue-700 shadow-xs dark:bg-blue-950 dark:text-blue-300">
+      {iniciales || "U"}
+    </span>
   );
 }
 
@@ -71,7 +144,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const { t } = useT();
   const router = useRouter();
   const pathname = usePathname();
-  // Hoja de "Más" del menú del celular.
+  // Hoja modal de "Más" en móvil
   const [mas, setMas] = useState(false);
 
   // Sin acceso no hay panel: de vuelta a la entrada.
@@ -79,8 +152,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     if (listo && !perfil) router.replace("/");
   }, [listo, perfil, router]);
 
-  // Mientras se comprueba el acceso, la página se monta oculta para que Next pueda
-  // validar y precargar la ruta.
+  // Mientras se comprueba el acceso, la página se monta oculta.
   if (!listo || !perfil || !cargado) {
     return (
       <>
@@ -92,7 +164,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const admin = perfil.rol === "admin";
   const abiertas = tareas.filter(abierta);
-  // Lo que espera una acción de quien mira: revisiones para el administrador, tareas por aceptar o corregir para el resto.
+  // Lo que espera una acción de quien mira
   const porHacer = abiertas.filter((x) =>
     admin ? ESPERA_ADMIN.includes(x.estado) : x.estado === "asignada" || x.estado === "devuelta",
   ).length;
@@ -101,54 +173,62 @@ export function Shell({ children }: { children: React.ReactNode }) {
     { href: "/panel", icono: "inicio", label: t.nav.inicio, cuenta: porHacer, resaltar: true },
     { href: "/panel/tareas", icono: "tareas", label: t.nav.tareas, cuenta: abiertas.length, resaltar: false },
     { href: "/panel/obras", icono: "obras", label: t.nav.obras, cuenta: 0, resaltar: false },
-    { href: "/panel/historial", icono: "", label: t.nav.historial, cuenta: 0, resaltar: false },
+    { href: "/panel/historial", icono: "historial", label: t.nav.historial, cuenta: 0, resaltar: false },
     ...(admin
       ? [
-          { href: "/panel/informes", icono: "", label: t.nav.informes, cuenta: 0, resaltar: false },
-          { href: "/panel/equipo", icono: "", label: t.nav.equipo, cuenta: 0, resaltar: false },
+          { href: "/panel/informes", icono: "informes", label: t.nav.informes, cuenta: 0, resaltar: false },
+          { href: "/panel/equipo", icono: "equipo", label: t.nav.equipo, cuenta: 0, resaltar: false },
         ]
       : []),
   ];
-  // En el celular van abajo las tres secciones de todos los días; el resto queda en "Más".
-  const abajo = secciones.filter((s) => s.icono);
-  const resto = secciones.filter((s) => !s.icono);
+
+  // En el celular van abajo las 3 secciones principales; el resto en "Más".
+  const abajo = secciones.slice(0, 3);
+  const resto = secciones.slice(3);
   const activa = (href: string) => (href === "/panel" ? pathname === href : pathname.startsWith(href));
   const enResto = resto.some((s) => activa(s.href));
   const cerrar = () => (demo ? salirDemo() : void salir());
+
   const aviso = error && (
-    <p className="hoja mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-      {t.comun.errorCarga}
-      <button type="button" className="enlace" onClick={() => void recargar()}>
+    <div className="hoja mb-6 flex flex-wrap items-center justify-between gap-3 border-rose-200 bg-rose-50/70 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+      <span className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-rose-500" />
+        {t.comun.errorCarga}
+      </span>
+      <button type="button" className="btn btn-linea py-1 text-xs" onClick={() => void recargar()}>
         {t.comun.reintentar}
       </button>
-    </p>
+    </div>
   );
 
-  // El cliente tiene una sola pantalla, sin menú: el avance de su obra. Las páginas
-  // del equipo se montan ocultas y vacías, porque a él no le llega ningún dato de ellas.
+  // Vista cliente: diseño limpio y centrado sin barra lateral interna.
   if (perfil.rol === "cliente") {
     return (
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen flex-1 flex-col bg-papel">
         {demo && <BarraDemo />}
-        <header className="border-b border-regla">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
+        <header className="sticky top-0 z-20 border-b border-regla bg-hoja/90 backdrop-blur-md">
+          <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3.5">
             <Logo />
             <Ajustes />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-12 pt-7 sm:pt-10">
+        <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-16 pt-8 sm:pt-10">
           <div className="animate-entrar">
             {aviso}
             <VistaCliente />
           </div>
-          <p className="mt-12 flex items-center justify-between gap-4 border-t border-regla pt-5 text-sm text-gris">
-            <span className="min-w-0 truncate">
-              {perfil.nombre} · {t.roles.cliente}
-            </span>
-            <button type="button" className="enlace shrink-0 py-1" onClick={cerrar}>
+          <div className="mt-14 flex items-center justify-between gap-4 border-t border-regla pt-6 text-sm text-gris">
+            <div className="flex items-center gap-3">
+              <Avatar nombre={perfil.nombre} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-tinta">{perfil.nombre}</p>
+                <p className="text-xs text-gris">{t.roles.cliente}</p>
+              </div>
+            </div>
+            <button type="button" className="btn btn-linea py-1.5 text-xs" onClick={cerrar}>
               {demo ? t.demo.salir : t.comun.salir}
             </button>
-          </p>
+          </div>
         </main>
         <div className="hidden">{children}</div>
       </div>
@@ -156,54 +236,95 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col">
+    <div className="flex min-h-screen flex-1 flex-col bg-papel">
       {demo && <BarraDemo />}
       <div className="flex flex-1 flex-col lg:flex-row">
-        <aside className="flex shrink-0 flex-col border-b border-regla lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:border-b-0 lg:border-r">
-          <div className="flex items-center justify-between px-5 py-4 lg:block lg:px-6 lg:pb-0 lg:pt-8">
-            <Link href="/panel" aria-label={t.nav.inicio}>
+        {/* Barra lateral Desktop */}
+        <aside className="shrink-0 border-b border-regla bg-hoja lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
+          {/* Cabecera / Logo */}
+          <div className="flex items-center justify-between px-5 py-4 lg:px-6 lg:pb-4 lg:pt-6">
+            <Link href="/panel" aria-label={t.nav.inicio} className="transition-opacity hover:opacity-90">
               <Logo />
             </Link>
             <Ajustes className="lg:hidden" />
           </div>
 
-          <nav className="mt-10 hidden flex-col px-3 lg:flex">
-            {secciones.map((s) => (
-              <Link
-                key={s.href}
-                href={s.href}
-                aria-current={activa(s.href) ? "page" : undefined}
-                className={`flex items-center justify-between gap-3 rounded-[3px] px-3 py-2 text-[15px] font-medium transition-colors ${
-                  activa(s.href) ? "bg-tinta text-papel" : "text-gris hover:text-tinta"
-                }`}
-              >
-                {s.label}
-                {s.cuenta > 0 && (
-                  <span
-                    className={`font-mono text-[11px] ${
-                      s.resaltar ? "bg-marca px-1.5 py-0.5 text-[#16130e]" : activa(s.href) ? "text-papel/70" : ""
-                    }`}
-                  >
-                    {s.cuenta}
+          {/* Menú de navegación Desktop */}
+          <nav className="mt-4 hidden flex-1 flex-col gap-1 px-3 lg:flex">
+            {secciones.map((s) => {
+              const active = activa(s.href);
+              return (
+                <Link
+                  key={s.href}
+                  href={s.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
+                    active
+                      ? "bg-blue-50 font-semibold text-blue-700 shadow-xs dark:bg-blue-950/50 dark:text-blue-300"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
+                  }`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Icono
+                      nombre={s.icono}
+                      className={`h-5 w-5 transition-colors ${
+                        active
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
+                      }`}
+                    />
+                    {s.label}
                   </span>
-                )}
-              </Link>
-            ))}
+                  {s.cuenta > 0 && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums transition-colors ${
+                        s.resaltar
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : active
+                            ? "bg-blue-200/80 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      }`}
+                    >
+                      {s.cuenta}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </nav>
 
-          <div className="mt-auto hidden space-y-5 px-6 pb-7 lg:block">
-            <Ajustes />
-            <div className="border-t border-regla pt-5">
-              <p className="truncate font-medium">{perfil.nombre}</p>
-              <p className="rotulo mt-0.5">{t.roles[perfil.rol]}</p>
-              <button type="button" className="enlace mt-3 text-sm text-gris hover:text-tinta" onClick={cerrar}>
-                {demo ? t.demo.salir : t.comun.salir}
+          {/* Tarjeta de usuario y ajustes Desktop */}
+          <div className="mt-auto hidden flex-col gap-4 border-t border-regla p-4 lg:flex">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gris">
+                {t.comun.tema} / {t.comun.idioma}
+              </span>
+              <Ajustes />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-regla bg-papel/70 p-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Avatar nombre={perfil.nombre} />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-tinta">{perfil.nombre}</p>
+                  <p className="truncate text-[11px] text-gris">{t.roles[perfil.rol]}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={cerrar}
+                title={demo ? t.demo.salir : t.comun.salir}
+                aria-label={demo ? t.demo.salir : t.comun.salir}
+                className="rounded-lg p-1.5 text-gris transition-colors hover:bg-slate-200 hover:text-tinta dark:hover:bg-slate-700"
+              >
+                <Icono nombre="salir" className="h-4 w-4" />
               </button>
             </div>
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-5 pb-28 pt-7 lg:px-12 lg:py-11">
+        {/* Contenido principal */}
+        <main className="min-w-0 flex-1 px-4 pb-24 pt-6 sm:px-6 sm:pb-28 sm:pt-8 lg:px-10 lg:py-8">
           <div className="mx-auto max-w-5xl animate-entrar" key={pathname}>
             {aviso}
             {children}
@@ -211,32 +332,52 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
+      {/* Modal / Menú "Más" para Celular */}
       {mas && (
-        <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setMas(false)}>
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs transition-opacity lg:hidden"
+          onClick={() => setMas(false)}
+        >
           <div
-            className="absolute inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] animate-entrar border-t border-tinta bg-hoja px-5 pb-4 pt-2"
+            className="absolute inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto rounded-t-3xl border-t border-regla bg-hoja p-5 shadow-2xl animate-entrar"
             onClick={(e) => e.stopPropagation()}
           >
-            {resto.map((s) => (
-              <Link
-                key={s.href}
-                href={s.href}
-                onClick={() => setMas(false)}
-                aria-current={activa(s.href) ? "page" : undefined}
-                className={`flex min-h-14 items-center justify-between border-b border-regla text-lg font-medium ${
-                  activa(s.href) ? "" : "text-gris"
-                }`}
-              >
-                {s.label}
-                <span aria-hidden>→</span>
-              </Link>
-            ))}
-            <div className="flex min-h-14 items-center justify-between gap-4">
-              <span className="min-w-0">
-                <span className="block truncate font-medium">{perfil.nombre}</span>
-                <span className="rotulo">{t.roles[perfil.rol]}</span>
-              </span>
-              <button type="button" className="btn btn-linea shrink-0" onClick={cerrar}>
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700" />
+            <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-gris">
+              {t.nav.mas}
+            </h2>
+            <div className="divide-y divide-regla">
+              {resto.map((s) => {
+                const active = activa(s.href);
+                return (
+                  <Link
+                    key={s.href}
+                    href={s.href}
+                    onClick={() => setMas(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex min-h-[52px] items-center justify-between py-3 font-medium transition-colors ${
+                      active ? "font-semibold text-blue-600 dark:text-blue-400" : "text-tinta"
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Icono nombre={s.icono} className="h-5 w-5 text-gris" />
+                      {s.label}
+                    </span>
+                    <span className="text-gris">→</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-3 border-t border-regla pt-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar nombre={perfil.nombre} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-tinta">{perfil.nombre}</p>
+                  <p className="text-xs text-gris">{t.roles[perfil.rol]}</p>
+                </div>
+              </div>
+              <button type="button" className="btn btn-linea py-1.5 text-xs" onClick={cerrar}>
                 {demo ? t.demo.salir : t.comun.salir}
               </button>
             </div>
@@ -244,7 +385,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid auto-cols-fr grid-flow-col border-t border-tinta bg-hoja pb-[env(safe-area-inset-bottom)] lg:hidden">
+      {/* Barra de navegación inferior Celular (Touch-friendly 4-tabs) */}
+      <nav
+        aria-label="Navegación principal móvil"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-regla bg-hoja/95 pb-[env(safe-area-inset-bottom)] shadow-lg backdrop-blur-md lg:hidden"
+      >
         {abajo.map((s) => {
           const aqui = !mas && activa(s.href);
           return (
@@ -253,34 +398,41 @@ export function Shell({ children }: { children: React.ReactNode }) {
               href={s.href}
               onClick={() => setMas(false)}
               aria-current={aqui ? "page" : undefined}
-              className={`relative flex h-[4.25rem] flex-col items-center justify-center gap-1 text-xs font-medium ${
-                aqui ? "text-tinta" : "text-gris"
+              className={`relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+                aqui ? "font-semibold text-blue-600 dark:text-blue-400" : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
-              {aqui && <span aria-hidden className="absolute inset-x-5 top-0 h-[3px] bg-tinta" />}
-              <span className="relative">
-                <Icono nombre={s.icono} />
-                {s.resaltar && s.cuenta > 0 && (
-                  <span className="absolute -right-3.5 -top-1.5 min-w-5 bg-marca px-1 text-center font-mono text-[11px] leading-5 text-[#16130e]">
+              <div className="relative">
+                <Icono nombre={s.icono} className="h-5 w-5" />
+                {s.cuenta > 0 && (
+                  <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white shadow-xs">
                     {s.cuenta}
                   </span>
                 )}
-              </span>
-              {s.label}
+              </div>
+              <span>{s.label}</span>
+              {aqui && (
+                <span className="absolute bottom-1 h-1 w-6 rounded-full bg-blue-600 dark:bg-blue-400" />
+              )}
             </Link>
           );
         })}
+
         <button
           type="button"
           aria-expanded={mas}
           onClick={() => setMas((v) => !v)}
-          className={`relative flex h-[4.25rem] flex-col items-center justify-center gap-1 text-xs font-medium ${
-            mas || enResto ? "text-tinta" : "text-gris"
+          className={`relative flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+            mas || enResto
+              ? "font-semibold text-blue-600 dark:text-blue-400"
+              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
           }`}
         >
-          {(mas || enResto) && <span aria-hidden className="absolute inset-x-5 top-0 h-[3px] bg-tinta" />}
-          <Icono nombre="mas" />
-          {t.nav.mas}
+          <Icono nombre="mas" className="h-5 w-5" />
+          <span>{t.nav.mas}</span>
+          {(mas || enResto) && (
+            <span className="absolute bottom-1 h-1 w-6 rounded-full bg-blue-600 dark:bg-blue-400" />
+          )}
         </button>
       </nav>
     </div>

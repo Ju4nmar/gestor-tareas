@@ -15,7 +15,6 @@ export default function ActivarPage() {
   const { t } = useT();
   const router = useRouter();
   const codigo = (useSearchParams().get("codigo") ?? "").trim();
-  // undefined = consultando; null = el código no sirve.
   const [invitacion, setInvitacion] = useState<Invitacion | null | undefined>(codigo ? undefined : null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +31,6 @@ export default function ActivarPage() {
     };
   }, [codigo]);
 
-  // Cuenta ya activa: al panel.
   useEffect(() => {
     if (listo && perfil) router.replace("/panel");
   }, [listo, perfil, router]);
@@ -64,45 +62,50 @@ export default function ActivarPage() {
   return (
     <Marco titulo={t.activar.titulo}>
       {!invitacion ? (
-        <>
-          <p className="mt-4 leading-relaxed text-gris">{t.activar.invalida}</p>
-          <Link href="/" className="btn btn-linea mt-6 self-start">
+        <div className="mt-4 space-y-4">
+          <p className="text-sm leading-relaxed text-gris">{t.activar.invalida}</p>
+          <Link href="/" className="btn btn-linea inline-flex">
             {t.activar.irEntrar}
           </Link>
-        </>
+        </div>
       ) : "vencida" in invitacion ? (
-        <p className="mt-4 leading-relaxed text-gris">{t.activar.vencida}</p>
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4 text-xs font-semibold text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+          {t.activar.vencida}
+        </div>
       ) : porConfirmar ? (
-        <p className="hoja mt-6 p-4 leading-relaxed">{t.activar.confirmar(invitacion.email)}</p>
+        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs font-medium text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
+          {t.activar.confirmar(invitacion.email)}
+        </div>
       ) : email ? (
-        // Ya hay sesión (por ejemplo, al volver del correo de confirmación): solo falta unirla a la invitación.
-        <>
-          <p className="mt-4 leading-relaxed">{t.activar.hola(invitacion.name)}</p>
-          <p className="mt-2 font-mono text-sm text-gris">{email}</p>
+        <div className="mt-4 space-y-4">
+          <p className="text-sm font-semibold text-tinta">{t.activar.hola(invitacion.name)}</p>
+          <p className="font-mono text-xs text-gris">{email}</p>
           {error && (
-            <p role="alert" className="mt-4 text-sm font-medium text-alerta">
+            <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
               {error}
             </p>
           )}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button className="btn" disabled={enviando} onClick={() => void intentar(() => activarConSesion(codigo))}>
+          <div className="flex flex-wrap gap-2.5 pt-2">
+            <button className="btn btn-marca" disabled={enviando} onClick={() => void intentar(() => activarConSesion(codigo))}>
               {enviando ? t.activar.activando : t.activar.boton}
             </button>
-            <button className="btn btn-suave" onClick={() => void salir()}>
+            <button className="btn btn-linea" onClick={() => void salir()}>
               {t.comun.salir}
             </button>
           </div>
-        </>
+        </div>
       ) : (
-        <form onSubmit={crear} className="mt-4 space-y-4">
-          <p className="leading-relaxed">{t.activar.hola(invitacion.name)}</p>
-          <p className="font-mono text-sm text-gris">{invitacion.email}</p>
+        <form onSubmit={crear} className="mt-5 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-tinta">{t.activar.hola(invitacion.name)}</p>
+            <p className="font-mono text-xs text-gris">{invitacion.email}</p>
+          </div>
           <div>
             <label className="etiqueta" htmlFor="clave">
               {t.activar.clave}
             </label>
             <input className="campo" id="clave" name="clave" type="password" minLength={8} autoComplete="new-password" required />
-            <p className="mt-1.5 text-xs text-gris">{t.activar.claveAyuda}</p>
+            <p className="mt-1 text-xs text-gris">{t.activar.claveAyuda}</p>
           </div>
           <div>
             <label className="etiqueta" htmlFor="repetir">
@@ -111,11 +114,11 @@ export default function ActivarPage() {
             <input className="campo" id="repetir" name="repetir" type="password" minLength={8} autoComplete="new-password" required />
           </div>
           {error && (
-            <p role="alert" className="text-sm font-medium text-alerta">
+            <p role="alert" className="text-xs font-semibold text-rose-600 dark:text-rose-400">
               {error}
             </p>
           )}
-          <button className="btn w-full" disabled={enviando}>
+          <button className="btn btn-marca w-full" disabled={enviando}>
             {enviando ? t.activar.activando : t.activar.boton}
           </button>
         </form>

@@ -21,12 +21,12 @@ function porcentaje(lista: Tarea[]) {
 
 function Barra({ etiqueta, valor, maximo, color }: { etiqueta: string; valor: number; maximo: number; color: string }) {
   return (
-    <div className="grid grid-cols-[9.5rem_1fr_2rem] items-center gap-3 py-1.5">
-      <span className="truncate text-sm">{etiqueta}</span>
-      <span className="h-2.5 bg-regla">
-        <span className="block h-full" style={{ width: `${maximo ? (valor / maximo) * 100 : 0}%`, background: color }} />
+    <div className="grid grid-cols-[8.5rem_1fr_2.5rem] items-center gap-3 py-2">
+      <span className="truncate text-xs font-semibold text-tinta">{etiqueta}</span>
+      <span className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <span className="block h-full rounded-full transition-all" style={{ width: `${maximo ? (valor / maximo) * 100 : 0}%`, background: color }} />
       </span>
-      <span className="text-right font-mono text-xs">{valor}</span>
+      <span className="text-right font-mono text-xs font-semibold text-gris">{valor}</span>
     </div>
   );
 }
@@ -113,8 +113,7 @@ export default function InformesPage() {
         x.completada ? diaDe(x.completada) : "",
       ]),
     ];
-    // El BOM inicial hace que Excel lea bien las tildes.
-    const csv = "﻿" + filas.map((f) => f.map(celda).join(",")).join("\r\n");
+    const csv = "\uFEFF" + filas.map((f) => f.map(celda).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const enlace = Object.assign(document.createElement("a"), { href: url, download: `relevo-${hoy}.csv` });
     enlace.click();
@@ -122,60 +121,60 @@ export default function InformesPage() {
   };
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-10">
       <Encabezado rotulo={desde ? `${diaLargo(desde)} — ${diaLargo(hoy)}` : t.informes.periodos.todo} titulo={t.informes.titulo}>
-        <div className="flex flex-wrap gap-2">
-          <select className="campo w-auto" aria-label={t.informes.periodo} value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
+        <div className="flex flex-wrap items-center gap-2">
+          <select className="campo w-auto py-1.5 text-xs font-semibold" aria-label={t.informes.periodo} value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
             {Object.entries(t.informes.periodos).map(([valor, texto]) => (
               <option key={valor} value={valor}>
                 {texto}
               </option>
             ))}
           </select>
-          <button className="btn btn-linea" onClick={descargar}>
+          <button className="btn btn-linea py-1.5 text-xs font-semibold" onClick={descargar}>
             {t.informes.descargar}
           </button>
         </div>
       </Encabezado>
 
       <div>
-        <dl className="grid grid-cols-2 gap-y-6 border-y border-tinta py-6 sm:grid-cols-3 lg:grid-cols-6">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
           {cifras.map(([etiqueta, valor]) => (
-            <div key={etiqueta} className="border-l border-regla pl-4 first:border-l-0 first:pl-0">
-              <dd className="font-display text-4xl font-extrabold leading-none tracking-tight">{valor}</dd>
-              <dt className="rotulo mt-2">{etiqueta}</dt>
+            <div key={etiqueta} className="hoja p-4 shadow-xs">
+              <dt className="text-xs font-semibold uppercase tracking-wider text-gris">{etiqueta}</dt>
+              <dd className="mt-2 font-display text-3xl font-extrabold tracking-tight text-tinta">{valor}</dd>
             </div>
           ))}
         </dl>
-        <p className="mt-3 text-xs text-gris">{t.informes.nota}</p>
+        <p className="mt-2 text-xs text-gris">{t.informes.nota}</p>
       </div>
 
       <Seccion titulo={t.informes.porPersona}>
         {personas.length === 0 ? (
-          <p className="border-t border-regla py-4 text-sm text-gris">{t.informes.sinDatos}</p>
+          <div className="hoja p-8 text-center text-xs text-gris">{t.informes.sinDatos}</div>
         ) : (
-          <div className="overflow-x-auto border-t border-tinta">
-            <table className="w-full min-w-[34rem] text-sm">
+          <div className="hoja overflow-x-auto shadow-xs">
+            <table className="w-full min-w-[34rem] text-xs">
               <thead>
-                <tr className="border-b border-regla text-left">
+                <tr className="border-b border-regla bg-slate-50/70 text-left dark:bg-slate-800/40">
                   {[t.historial.persona, t.informes.abiertas, t.informes.completadas, t.informes.aTiempo, t.informes.vencidas, t.informes.devoluciones].map(
                     (c, i) => (
-                      <th key={c} className={`rotulo py-2 font-normal ${i > 0 ? "text-right" : ""}`}>
+                      <th key={c} className={`p-3 font-bold uppercase tracking-wider text-gris ${i > 0 ? "text-right" : ""}`}>
                         {c}
                       </th>
                     ),
                   )}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-regla">
                 {personas.map((f) => (
-                  <tr key={f.p.id} className="border-b border-regla">
-                    <td className="py-3 font-medium">{f.p.nombre}</td>
-                    <td className="text-right font-mono">{f.abiertas}</td>
-                    <td className="text-right font-mono">{f.hechas}</td>
-                    <td className="text-right font-mono">{f.aTiempo}</td>
-                    <td className={`text-right font-mono ${f.vencidas ? "font-medium text-alerta" : ""}`}>{f.vencidas}</td>
-                    <td className="text-right font-mono">{f.devueltas}</td>
+                  <tr key={f.p.id} className="transition-colors hover:bg-slate-50/40 dark:hover:bg-slate-800/20">
+                    <td className="p-3 font-semibold text-tinta">{f.p.nombre}</td>
+                    <td className="p-3 text-right font-mono text-gris">{f.abiertas}</td>
+                    <td className="p-3 text-right font-mono text-gris">{f.hechas}</td>
+                    <td className="p-3 text-right font-mono font-semibold text-tinta">{f.aTiempo}</td>
+                    <td className={`p-3 text-right font-mono ${f.vencidas ? "font-bold text-rose-600 dark:text-rose-400" : "text-gris"}`}>{f.vencidas}</td>
+                    <td className="p-3 text-right font-mono text-gris">{f.devueltas}</td>
                   </tr>
                 ))}
               </tbody>
@@ -186,25 +185,25 @@ export default function InformesPage() {
 
       {porObra.length > 0 && (
         <Seccion titulo={t.informes.porObra}>
-          <div className="overflow-x-auto border-t border-tinta">
-            <table className="w-full min-w-[34rem] text-sm">
+          <div className="hoja overflow-x-auto shadow-xs">
+            <table className="w-full min-w-[34rem] text-xs">
               <thead>
-                <tr className="border-b border-regla text-left">
+                <tr className="border-b border-regla bg-slate-50/70 text-left dark:bg-slate-800/40">
                   {[t.campos.obra, t.informes.abiertas, t.informes.completadas, t.informes.vencidas, t.obras.avanceCorto].map((c, i) => (
-                    <th key={c} className={`rotulo py-2 font-normal ${i > 0 ? "text-right" : ""}`}>
+                    <th key={c} className={`p-3 font-bold uppercase tracking-wider text-gris ${i > 0 ? "text-right" : ""}`}>
                       {c}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-regla">
                 {porObra.map((f) => (
-                  <tr key={f.id ?? "ninguna"} className="border-b border-regla">
-                    <td className="py-3 font-medium">{f.nombre}</td>
-                    <td className="text-right font-mono">{f.abiertas}</td>
-                    <td className="text-right font-mono">{f.hechas}</td>
-                    <td className={`text-right font-mono ${f.vencidas ? "font-medium text-alerta" : ""}`}>{f.vencidas}</td>
-                    <td className="text-right font-mono">{f.avance}</td>
+                  <tr key={f.id ?? "ninguna"} className="transition-colors hover:bg-slate-50/40 dark:hover:bg-slate-800/20">
+                    <td className="p-3 font-semibold text-tinta">{f.nombre}</td>
+                    <td className="p-3 text-right font-mono text-gris">{f.abiertas}</td>
+                    <td className="p-3 text-right font-mono text-gris">{f.hechas}</td>
+                    <td className={`p-3 text-right font-mono ${f.vencidas ? "font-bold text-rose-600 dark:text-rose-400" : "text-gris"}`}>{f.vencidas}</td>
+                    <td className="p-3 text-right font-mono font-semibold text-blue-600 dark:text-blue-400">{f.avance}</td>
                   </tr>
                 ))}
               </tbody>
@@ -213,16 +212,16 @@ export default function InformesPage() {
         </Seccion>
       )}
 
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Seccion titulo={t.informes.porEstado}>
-          <div className="border-t border-regla pt-2">
+          <div className="hoja p-4 shadow-xs">
             {porEstado.map(({ e, n }) => (
               <Barra key={e} etiqueta={t.estados[e]} valor={n} maximo={Math.max(...porEstado.map((x) => x.n))} color={`var(--e-${e})`} />
             ))}
           </div>
         </Seccion>
         <Seccion titulo={t.informes.porPrioridad}>
-          <div className="border-t border-regla pt-2">
+          <div className="hoja p-4 shadow-xs">
             {porPrioridad.map(({ p, n }) => (
               <Barra
                 key={p}
