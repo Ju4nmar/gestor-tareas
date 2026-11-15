@@ -126,3 +126,21 @@ Ejecutar `npm test`, `npx tsc --noEmit`, `npm run lint` y `npm run build`.
 En SQL Editor, ejecutar `supabase/tests/empresas.sql` como postgres. Comprueba aislamiento, roles por
 empresa, invitaciones de cuentas existentes, numeración independiente y permisos de archivos y
 limpieza. Todo se ejecuta en una transacción que termina con ROLLBACK.
+
+
+### Vistas previas y comprobaciones automaticas
+
+Vercel Preview utiliza `NEXT_PUBLIC_DEMO_ONLY=true`. La muestra se abre con datos ficticios y permite
+cambiar entre administrador, empleado y cliente. El cliente bloquea consultas, autenticacion y
+archivos de Supabase en este modo. Las variables de conexion a Supabase estan limitadas a Produccion.
+Para trabajar localmente con la muestra puede usarse la misma variable. Con su valor predeterminado,
+la conexion local se toma de `.env.local`.
+
+GitHub Actions ejecuta pruebas, generacion de tipos de Next.js, TypeScript, lint y compilacion al abrir
+una solicitud a `main` y al integrar cambios en `main`. Usa Node.js 24 y Ubuntu con permisos de lectura,
+un limite de 15 minutos y cancelacion de ejecuciones anteriores de la misma rama. Las comprobaciones
+utilizan la demo. El resultado se ve en el control `Verificaciones` de cada solicitud de integracion.
+Vercel ejecuta tambien `npm test && npm run lint && npm run build` antes de publicar.
+GitHub mantiene una cuota de uso incluida. El limite de gasto de la cuenta se revisa en Billing >
+Budgets and alerts. La proteccion obligatoria de main en este repositorio privado depende de un plan
+compatible de GitHub.

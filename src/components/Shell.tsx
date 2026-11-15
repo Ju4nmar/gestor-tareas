@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ESPERA_ADMIN, abierta } from "@/lib/flujo";
+import { SOLO_DEMO } from "@/lib/entorno";
 import { personasDemo, recargar, salir, salirDemo, useStore, verComo } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import { VistaCliente } from "./Cliente";
@@ -19,7 +20,7 @@ function BarraDemo() {
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-            {t.demo.aviso}
+            {SOLO_DEMO ? "Vista previa · datos ficticios" : t.demo.aviso}
           </span>
           <span className="hidden text-slate-400 sm:inline">·</span>
           <label className="flex items-center gap-2 text-slate-300">
@@ -43,7 +44,7 @@ function BarraDemo() {
           className="rounded-md px-2.5 py-1 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-100"
           onClick={salirDemo}
         >
-          {t.demo.salir}
+          {SOLO_DEMO ? "Reiniciar demo" : t.demo.salir}
         </button>
       </div>
     </div>
