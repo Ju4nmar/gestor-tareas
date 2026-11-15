@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SOLO_DEMO } from "@/lib/entorno";
 import { Ajustes, Logo } from "./ui";
 
 /** Página suelta y centrada: activar la cuenta o cambiar la contraseña. */
@@ -14,7 +15,14 @@ export function Marco({ titulo, children }: { titulo: string; children: React.Re
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
         <div className="rounded-2xl border border-regla bg-hoja p-6 shadow-sm sm:p-8">
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-tinta sm:text-3xl">{titulo}</h1>
-          {children}
+          {SOLO_DEMO ? (
+            <div className="mt-5 space-y-4">
+              <p className="text-sm leading-relaxed text-gris">
+                Esta vista previa utiliza datos de demostración. Explora las obras, tareas y roles desde el panel.
+              </p>
+              <Link href="/demo" className="btn btn-marca inline-flex">Abrir demo</Link>
+            </div>
+          ) : children}
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 import * as demo from "./demo";
+import { SOLO_DEMO } from "./entorno";
 import { fechaLocal } from "./fechas";
 import { ErrorFlujo } from "./flujo";
 import { seleccionarEmpresaApi, supabase } from "./supabase";
@@ -444,6 +445,7 @@ export const recargarAcceso = () => aplicarSesion(sesionActual);
 function start() {
   const muestra = leerDemo();
   if (muestra) return ponerDemo(muestra);
+  if (SOLO_DEMO) return entrarDemo("admin");
   supabase.auth.onAuthStateChange((_event, session) => {
     // Las consultas se ejecutan fuera del bloqueo de Supabase Auth.
     setTimeout(() => {
