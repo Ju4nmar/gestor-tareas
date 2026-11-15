@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Elegidos, Elegir, Galeria } from "@/components/Archivos";
+import { useBorrador } from "@/lib/borradores";
+import { Elegidos, Elegir, Galeria, ProgresoSubida, useSubidaArchivos } from "@/components/Archivos";
 import { TareaForm } from "@/components/TareaForm";
 import { Barras, SIN_MENSAJE, Sello, Vence, falloDe, frase, useNombres, useObras } from "@/components/ui";
 import { ESPERA_ADMIN, NOTA_MAXIMA, NOTA_MINIMA, REGLAS, codigoTarea, pasosDisponibles } from "@/lib/flujo";
-import { actuar, archivarTarea, borrarTarea, subirArchivos, useStore } from "@/lib/store";
+import { actuar, archivarTarea, borrarTarea, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Accion, Evento, Perfil, Tarea } from "@/lib/types";
 
@@ -16,8 +17,12 @@ function Pasos({ tarea, perfil, onHecho }: { tarea: Tarea; perfil: Perfil; onHec
   const { t } = useT();
   const nombre = useNombres();
   const [abierto, setAbierto] = useState<Accion | null>(null);
-  const [nota, setNota] = useState("");
+  const {perfil: yo,empresa} = useStore();
+  const borrador = useBorrador(`${yo?.userId ?? yo?.id}:${empresa?.id}:nota:${tarea.id}:${abierto ?? "sin-paso"}`, "");
+  const nota = borrador.valor;
+  const setNota = borrador.escribir;
   const [files, setFiles] = useState<File[]>([]);
+  const subida = useSubidaArchivos();
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const pasos = pasosDisponibles(tarea, perfil);
@@ -27,12 +32,12 @@ function Pasos({ tarea, perfil, onHecho }: { tarea: Tarea; perfil: Perfil; onHec
     setError("");
     try {
       if (files.length) {
-        await subirArchivos(tarea.id, files);
+        await subida.subir(tarea.id, files);
         setFiles([]);
       }
       await actuar(tarea.id, accion, texto);
+      borrador.limpiar();
       setAbierto(null);
-      setNota("");
       onHecho();
     } catch (e) {
       setError(t.fallos[falloDe(e)]);
@@ -43,7 +48,6 @@ function Pasos({ tarea, perfil, onHecho }: { tarea: Tarea; perfil: Perfil; onHec
 
   const elegir = (accion: Accion) => {
     setError("");
-    setNota("");
     setFiles([]);
     if (REGLAS[accion].nota === "no") void dar(accion);
     else setAbierto(accion);
@@ -97,6 +101,7 @@ function Pasos({ tarea, perfil, onHecho }: { tarea: Tarea; perfil: Perfil; onHec
           <p className="etiqueta mt-4">{perfil.rol === "admin" ? t.archivos.agregar : t.archivos.conNota}</p>
           <Elegir onElegir={(nuevos) => setFiles((prev) => [...prev, ...nuevos])} ocupado={enviando} />
           <Elegidos files={files} onQuitar={(i) => setFiles((prev) => prev.filter((_, n) => n !== i))} />
+          <ProgresoSubida progreso={subida.progreso} />
           {files.length > 0 && <p className="mt-2 text-xs text-gris">{t.archivos.elegidos(files.length)}</p>}
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button className="btn btn-marca" disabled={enviando}>
@@ -135,7 +140,10 @@ function Pasos({ tarea, perfil, onHecho }: { tarea: Tarea; perfil: Perfil; onHec
 
 function Comentar({ tarea }: { tarea: Tarea }) {
   const { t } = useT();
-  const [nota, setNota] = useState("");
+  const {perfil,empresa} = useStore();
+  const borrador = useBorrador(`${perfil?.userId ?? perfil?.id}:${empresa?.id}:comentario:${tarea.id}`, "");
+  const nota = borrador.valor;
+  const setNota = borrador.escribir;
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
 
@@ -146,7 +154,7 @@ function Comentar({ tarea }: { tarea: Tarea }) {
     setError("");
     try {
       await actuar(tarea.id, "comentar", nota);
-      setNota("");
+      borrador.limpiar();
     } catch (e) {
       setError(t.fallos[falloDe(e)]);
     } finally {
@@ -294,7 +302,7 @@ export default function TareaPage() {
 
       {editando ? (
         <div className="rounded-2xl border border-regla bg-hoja p-5 shadow-sm sm:p-7">
-          <TareaForm tarea={tarea} onCancel={() => setEditando(false)} onDone={() => setEditando(false)} />
+          <TareaForm key={tarea.id} tarea={tarea} onCancel={() => setEditando(false)} onDone={() => setEditando(false)} />
         </div>
       ) : (
         <>
@@ -312,6 +320,7 @@ export default function TareaPage() {
               <Vence tarea={tarea} />
             </div>
 
+            {admin && <Link className="enlace mt-4 inline-block text-xs" href={`/panel/tareas?duplicar=${tarea.id}`}>Duplicar tarea</Link>}
             <h1 className="mt-4 font-display text-2xl font-extrabold tracking-tight text-tinta sm:text-3xl">
               {tarea.titulo}
             </h1>

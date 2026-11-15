@@ -2143,3 +2143,448 @@ create index if not exists tm_files_uploader_idx on public.tm_files(uploaded_by)
 create index if not exists tm_project_clients_company_project_idx on public.tm_project_clients(company_id, project_id);
 create index if not exists tm_project_clients_company_profile_idx on public.tm_project_clients(company_id, profile_id);
 notify pgrst, 'reload schema';
+
+-- PARTE 9: mejoras operativas
+-- Mejoras compatibles con los datos y llamadas anteriores.
+alter table public.tm_tasks add column if not exists weight integer not null default 1 check(weight between 1 and 1000);
+alter table public.tm_tasks add column if not exists request_id uuid;
+create unique index if not exists tm_tasks_request_idx on public.tm_tasks(company_id, request_id) where request_id is not null;
+create index if not exists tm_tasks_search_idx on public.tm_tasks using gin(to_tsvector('spanish', title || ' ' || description));
+alter table public.tm_companies add column if not exists contact text not null default '' check(char_length(contact) <= 200);
+alter table public.tm_companies add column if not exists phone text not null default '' check(char_length(phone) <= 50);
+alter table public.tm_companies add column if not exists logo_path text;
+
+create table if not exists public.tm_templates (
+ id uuid primary key default gen_random_uuid(),
+ company_id uuid not null default private.tm_company_id() references public.tm_companies(id),
+ name text not null check(char_length(trim(name)) between 2 and 80),
+ title text not null check(char_length(trim(title)) between 3 and 140),
+ description text not null default '' check(char_length(description) <= 5000),
+ priority text not null default 'media' check(priority in ('baja','media','alta','urgente')),
+ weight integer not null default 1 check(weight between 1 and 1000)
+);
+create index if not exists tm_templates_company_idx on public.tm_templates(company_id);
+create table if not exists public.tm_read_markers (
+ company_id uuid not null references public.tm_companies(id),
+ profile_id uuid not null,
+ seen_at timestamptz not null default now(),
+ primary key(company_id,profile_id),
+ foreign key(company_id,profile_id) references public.tm_profiles(company_id,id) on delete cascade
+);
+alter table public.tm_templates enable row level security;
+alter table public.tm_read_markers enable row level security;
+revoke all on public.tm_templates, public.tm_read_markers from anon, authenticated;
+grant select on public.tm_templates, public.tm_read_markers to authenticated;
+grant select,insert,update,delete on public.tm_templates, public.tm_read_markers to trazo_api;
+create policy tm_templates_read on public.tm_templates for select to authenticated
+ using(company_id = (select private.tm_company_id()) and (select private.tm_is_admin()));
+create policy tm_markers_read on public.tm_read_markers for select to authenticated
+ using(company_id = (select private.tm_company_id()) and profile_id = (select private.tm_my_id()));
+create policy tm_templates_internal on public.tm_templates for all to trazo_api
+ using(company_id = (select private.tm_company_id()) and (select private.tm_has_company(private.tm_company_id())))
+ with check(company_id = (select private.tm_company_id()) and (select private.tm_has_company(private.tm_company_id())));
+create policy tm_markers_internal on public.tm_read_markers for all to trazo_api
+ using(company_id = (select private.tm_company_id()) and profile_id = (select private.tm_my_id()))
+ with check(company_id = (select private.tm_company_id()) and profile_id = (select private.tm_my_id()));
+
+grant create on schema private to trazo_api;
+create or replace function private.tm_save_task_v2(p_id uuid,p_request uuid,p_data jsonb)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_admin uuid := private.tm_require_admin(); v_id uuid; v_weight int := coalesce((p_data->>'weight')::int,1);
+begin
+ if v_weight not between 1 and 1000 then raise exception 'peso'; end if;
+ if p_id is null then
+   if p_request is null then raise exception 'sesion'; end if;
+   perform pg_advisory_xact_lock(hashtextextended(private.tm_company_id()::text || p_request::text,0));
+   select id into v_id from public.tm_tasks where request_id=p_request;
+   if found then return v_id; end if;
+ end if;
+ v_id := private.tm_save_task(p_id,p_data->>'title',coalesce(p_data->>'description',''),p_data->>'priority',nullif(p_data->>'due_date','')::date,nullif(p_data->>'assignee_id','')::uuid,nullif(p_data->>'project_id','')::uuid);
+ update public.tm_tasks set weight=v_weight,request_id=coalesce(request_id,p_request) where id=v_id;
+ return v_id;
+end $$;
+alter function private.tm_save_task_v2(uuid,uuid,jsonb) owner to trazo_api;
+create or replace function public.tm_save_task_v2(p_id uuid,p_request uuid,p_data jsonb)
+returns uuid language sql security invoker set search_path='' as $$ select private.tm_save_task_v2(p_id,p_request,p_data); $$;
+
+create or replace function private.tm_save_template(p_id uuid,p_data jsonb)
+returns uuid language plpgsql security definer set search_path='' as $$
+declare v_admin uuid := private.tm_require_admin(); v_id uuid;
+begin
+ if p_id is not null then
+   delete from public.tm_templates where id=p_id returning id into v_id;
+   if not found then raise exception 'no_existe'; end if;
+   return v_id;
+ end if;
+ insert into public.tm_templates(name,title,description,priority,weight)
+ values(p_data->>'name',p_data->>'title',coalesce(p_data->>'description',''),p_data->>'priority',coalesce((p_data->>'weight')::int,1)) returning id into v_id;
+ return v_id;
+end $$;
+alter function private.tm_save_template(uuid,jsonb) owner to trazo_api;
+create or replace function public.tm_save_template(p_id uuid,p_data jsonb)
+returns uuid language sql security invoker set search_path='' as $$ select private.tm_save_template(p_id,p_data); $$;
+
+create or replace function private.tm_update_company(p_name text,p_contact text,p_phone text,p_logo text)
+returns void language plpgsql security definer set search_path='' as $$
+declare v_admin uuid := private.tm_require_admin();
+begin
+ if char_length(trim(p_name)) not between 2 and 80 then raise exception 'nombre'; end if;
+ if p_logo is not null and p_logo <> private.tm_company_id()::text || '/logo.jpg' then raise exception 'archivo'; end if;
+ update public.tm_companies set name=trim(p_name),contact=trim(coalesce(p_contact,'')),phone=trim(coalesce(p_phone,'')),logo_path=p_logo where id=private.tm_company_id();
+end $$;
+grant update on public.tm_companies to trazo_api;
+create policy tm_companies_internal_update on public.tm_companies for update to trazo_api
+ using(id=(select private.tm_company_id()) and (select private.tm_is_admin()))
+ with check(id=(select private.tm_company_id()) and (select private.tm_is_admin()));
+alter function private.tm_update_company(text,text,text,text) owner to trazo_api;
+create or replace function public.tm_update_company(p_name text,p_contact text,p_phone text,p_logo text)
+returns void language sql security invoker set search_path='' as $$ select private.tm_update_company(p_name,p_contact,p_phone,p_logo); $$;
+
+create or replace function private.tm_mark_seen()
+returns timestamptz language plpgsql security definer set search_path='' as $$
+declare v_me uuid:=private.tm_my_id(); v_seen timestamptz;
+begin
+ if v_me is null then raise exception 'sesion'; end if;
+ insert into public.tm_read_markers(company_id,profile_id,seen_at) values(private.tm_company_id(),v_me,clock_timestamp())
+ on conflict(company_id,profile_id) do update set seen_at=excluded.seen_at returning seen_at into v_seen;
+ return v_seen;
+end $$;
+alter function private.tm_mark_seen() owner to trazo_api;
+create or replace function public.tm_mark_seen()
+returns timestamptz language sql security invoker set search_path='' as $$ select private.tm_mark_seen(); $$;
+
+create or replace function public.tm_search_tasks(p_filter jsonb,p_offset int default 0,p_limit int default 30)
+returns jsonb language sql stable security invoker set search_path='' as $$
+ with filtered as (
+ select t.* from public.tm_tasks t
+ where archived_at is null
+ and (coalesce(p_filter->>'q','')='' or to_tsvector('spanish',title || ' ' || description) @@ plainto_tsquery('spanish',p_filter->>'q') or number::text=ltrim(regexp_replace(upper(p_filter->>'q'),'^T-?',''),'0'))
+ and (coalesce(p_filter->>'project','')='' or (p_filter->>'project'='ninguna' and project_id is null) or project_id::text=p_filter->>'project')
+ and (coalesce(p_filter->>'assignee','')='' or (p_filter->>'assignee'='nadie' and assignee_id is null) or assignee_id::text=p_filter->>'assignee')
+ and (coalesce(p_filter->>'priority','')='' or priority=p_filter->>'priority')
+ and (coalesce(p_filter->>'status','')='' or status=p_filter->>'status')
+ and (coalesce(p_filter->>'view','todas')='todas' or (p_filter->>'view'='abiertas' and status<>'completada') or (p_filter->>'view'='completadas' and status='completada'))
+ and (not coalesce((p_filter->>'overdue')::boolean,false) or (due_date < (now() at time zone 'America/Bogota')::date and status<>'completada'))
+ and (coalesce(p_filter->>'from','')='' or due_date >= (p_filter->>'from')::date)
+ and (coalesce(p_filter->>'to','')='' or due_date <= (p_filter->>'to')::date)
+ ), page as (select * from filtered order by due_date nulls last,number desc limit greatest(1,least(coalesce(p_limit,30),100)) offset greatest(0,coalesce(p_offset,0)))
+ select jsonb_build_object('total',(select count(*) from filtered),'rows',coalesce((select jsonb_agg(to_jsonb(page)) from page),'[]'::jsonb));
+$$;
+
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('empresas','empresas',false,1048576,array['image/jpeg']) on conflict(id) do nothing;
+create policy empresas_read on storage.objects for select to authenticated using(bucket_id='empresas' and name=(select private.tm_company_id())::text || '/logo.jpg' and (select private.tm_has_company(private.tm_company_id())));
+create policy empresas_insert on storage.objects for insert to authenticated with check(bucket_id='empresas' and name=(select private.tm_company_id())::text || '/logo.jpg' and (select private.tm_is_admin()));
+create policy empresas_update on storage.objects for update to authenticated using(bucket_id='empresas' and name=(select private.tm_company_id())::text || '/logo.jpg' and (select private.tm_is_admin())) with check(bucket_id='empresas' and name=(select private.tm_company_id())::text || '/logo.jpg' and (select private.tm_is_admin()));
+
+revoke create on schema private from trazo_api;
+revoke all on function private.tm_save_task_v2(uuid,uuid,jsonb), public.tm_save_task_v2(uuid,uuid,jsonb), private.tm_save_template(uuid,jsonb), public.tm_save_template(uuid,jsonb), private.tm_update_company(text,text,text,text), public.tm_update_company(text,text,text,text), private.tm_mark_seen(), public.tm_mark_seen(), public.tm_search_tasks(jsonb,int,int) from public,anon;
+grant execute on function private.tm_save_task_v2(uuid,uuid,jsonb), public.tm_save_task_v2(uuid,uuid,jsonb), private.tm_save_template(uuid,jsonb), public.tm_save_template(uuid,jsonb), private.tm_update_company(text,text,text,text), public.tm_update_company(text,text,text,text), private.tm_mark_seen(), public.tm_mark_seen(), public.tm_search_tasks(jsonb,int,int) to authenticated;
+notify pgrst,'reload schema';
+
+create or replace function private.tm_client_view()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', p.id,
+    'name', p.name,
+    'detail', p.detail,
+    'active', p.active,
+    'tasks', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', t.id,
+        'number', t.number,
+        'title', t.title,
+        'stage', case
+          when t.status = 'completada' then 'terminada'
+          when t.status in ('en_curso', 'enviada', 'en_revision', 'devuelta') then 'en_proceso'
+          else 'pendiente'
+        end,
+        'due_date', t.due_date,
+        'completed_at', t.completed_at,
+        'weight', t.weight
+      ) order by t.number)
+      from public.tm_tasks t
+      where t.project_id = p.id and t.archived_at is null
+    ), '[]'::jsonb),
+    'files', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', f.id,
+        'task_id', f.task_id,
+        'path', f.path,
+        'name', f.name,
+        'mime', f.mime,
+        'created_at', f.created_at
+      ) order by f.created_at desc)
+      from public.tm_files f
+      join public.tm_tasks t on t.id = f.task_id
+      where t.project_id = p.id and t.archived_at is null
+    ), '[]'::jsonb)
+  ) order by p.created_at), '[]'::jsonb)
+  from public.tm_projects p
+  join public.tm_project_clients c on c.project_id = p.id
+  where c.profile_id = private.tm_my_id();
+$$;
+
+-- PARTE 10: reintentos idempotentes de archivos
+grant create on schema private to trazo_api;
+create or replace function private.tm_add_file_v2(p_task uuid,p_path text,p_name text,p_mime text,p_size int)
+returns uuid language plpgsql security definer set search_path='' as $$
+declare v_id uuid;
+begin
+ if not private.tm_can_write_path(p_path) or p_path not like p_task::text || '/%' then raise exception 'permiso'; end if;
+ perform pg_advisory_xact_lock(hashtextextended(p_path,0));
+ select id into v_id from public.tm_files where path=p_path and task_id=p_task;
+ if found then return v_id; end if;
+ return private.tm_add_file(p_task,p_path,p_name,p_mime,p_size);
+end $$;
+alter function private.tm_add_file_v2(uuid,text,text,text,int) owner to trazo_api;
+revoke create on schema private from trazo_api;
+create or replace function public.tm_add_file_v2(p_task uuid,p_path text,p_name text,p_mime text,p_size int)
+returns uuid language sql security invoker set search_path='' as $$ select private.tm_add_file_v2(p_task,p_path,p_name,p_mime,p_size); $$;
+revoke all on function private.tm_add_file_v2(uuid,text,text,text,int),public.tm_add_file_v2(uuid,text,text,text,int) from public,anon;
+grant execute on function private.tm_add_file_v2(uuid,text,text,text,int),public.tm_add_file_v2(uuid,text,text,text,int) to authenticated;
+notify pgrst,'reload schema';
+
+-- PARTE 11: respaldos de empresa y recuperacion independiente
+-- Exportacion consistente por empresa. Los secretos de Auth quedan en el servicio de autenticacion.
+grant create on schema private to trazo_api;
+create or replace function private.tm_export_company()
+returns jsonb language plpgsql stable security definer set search_path='' as $$
+declare v_admin uuid:=private.tm_require_admin(); v_company uuid:=private.tm_company_id();
+begin
+ return jsonb_build_object('version',1,'owner_profile_id',v_admin,'company',(select to_jsonb(c) from public.tm_companies c where id=v_company),
+ 'profiles',coalesce((select jsonb_agg(to_jsonb(p)-'user_id'-'invite_code'-'invite_expires_at') from public.tm_profiles p where company_id=v_company),'[]'),
+ 'projects',coalesce((select jsonb_agg(to_jsonb(p)) from public.tm_projects p where company_id=v_company),'[]'),
+ 'tasks',coalesce((select jsonb_agg(to_jsonb(p) order by number) from public.tm_tasks p where company_id=v_company),'[]'),
+ 'events',coalesce((select jsonb_agg(to_jsonb(p) order by id) from public.tm_events p where company_id=v_company),'[]'),
+ 'files',coalesce((select jsonb_agg(to_jsonb(p)) from public.tm_files p where company_id=v_company),'[]'),
+ 'clients',coalesce((select jsonb_agg(to_jsonb(p)) from public.tm_project_clients p where company_id=v_company),'[]'),
+ 'templates',coalesce((select jsonb_agg(to_jsonb(p)) from public.tm_templates p where company_id=v_company),'[]'));
+end $$;
+alter function private.tm_export_company() owner to trazo_api;
+revoke create on schema private from trazo_api;
+create or replace function public.tm_export_company()
+returns jsonb language sql security invoker set search_path='' as $$ select private.tm_export_company(); $$;
+
+create table if not exists private.tm_restore_jobs (
+ company_id uuid primary key references public.tm_companies(id),
+ created_by uuid not null references auth.users(id),
+ digest text not null,
+ paths jsonb not null,
+ finished boolean not null default false
+);
+alter table private.tm_restore_jobs enable row level security;
+create index if not exists tm_restore_jobs_creator_idx on private.tm_restore_jobs(created_by);
+revoke all on private.tm_restore_jobs from public,anon,authenticated,trazo_api;
+
+-- Cada recuperacion crea una empresa independiente y remapea todas sus relaciones.
+create or replace function private.tm_restore_company(p_id uuid,p_backup jsonb)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+ v_uid uuid:=auth.uid(); v_admin uuid; v_row jsonb; v_id uuid; v_owner text:=p_backup->>'owner_profile_id';
+ v_profiles jsonb:='{}'; v_projects jsonb:='{}'; v_tasks jsonb:='{}'; v_paths jsonb:='[]';
+ v_job private.tm_restore_jobs; v_digest text:=md5(p_backup::text); v_path text;
+begin
+ if v_uid is null or coalesce((auth.jwt()->>'is_anonymous')::boolean,false) then raise exception 'sesion'; end if;
+ if not exists(select 1 from auth.users where id=v_uid and email_confirmed_at is not null) then raise exception 'confirmar'; end if;
+ perform pg_advisory_xact_lock(hashtextextended(p_id::text,0));
+ select * into v_job from private.tm_restore_jobs where company_id=p_id;
+ if found then
+   if v_job.created_by<>v_uid or v_job.digest<>v_digest then raise exception 'permiso'; end if;
+   return jsonb_build_object('company_id',p_id,'paths',v_job.paths,'finished',v_job.finished);
+ end if;
+ if (p_backup->>'version')::int<>1 or octet_length(p_backup::text)>30000000 or jsonb_array_length(p_backup->'tasks')>10000 or jsonb_array_length(p_backup->'profiles')>2000 or jsonb_array_length(p_backup->'files')>10000 then raise exception 'archivo'; end if;
+ if exists(select 1 from public.tm_companies where id=p_id) then raise exception 'duplicado'; end if;
+ if not exists(select 1 from jsonb_array_elements(p_backup->'profiles') p where p->>'id'=v_owner and p->>'role'='admin') then raise exception 'archivo'; end if;
+ perform public.tm_create_company(p_id,left(p_backup->'company'->>'name',65)||' (recuperada)','Administrador');
+ perform set_config('request.headers',jsonb_build_object('x-trazo-company',p_id)::text,true);
+ select id into v_admin from public.tm_profiles where company_id=p_id and user_id=v_uid;
+ v_profiles:=jsonb_build_object(v_owner,v_admin);
+ update public.tm_companies set contact=coalesce(p_backup->'company'->>'contact',''),phone=coalesce(p_backup->'company'->>'phone','') where id=p_id;
+ for v_row in select value from jsonb_array_elements(p_backup->'profiles') loop
+   if v_row->>'id'=v_owner then
+     update public.tm_profiles set name=v_row->>'name' where id=v_admin;
+   else
+     insert into public.tm_profiles(company_id,name,email,role,active,invite_code,invite_expires_at)
+     values(p_id,v_row->>'name',v_row->>'email',v_row->>'role',coalesce((v_row->>'active')::boolean,true),private.tm_code(),now()+private.tm_invite_ttl()) returning id into v_id;
+     v_profiles:=v_profiles||jsonb_build_object(v_row->>'id',v_id);
+   end if;
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'projects') loop
+   insert into public.tm_projects(company_id,name,detail,active) values(p_id,v_row->>'name',coalesce(v_row->>'detail',''),(v_row->>'active')::boolean) returning id into v_id;
+   v_projects:=v_projects||jsonb_build_object(v_row->>'id',v_id);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'tasks') order by (value->>'number')::int loop
+   insert into public.tm_tasks(company_id,title,description,priority,due_date,assignee_id,project_id,status,created_by,created_at,updated_at,completed_at,weight)
+   values(p_id,v_row->>'title',coalesce(v_row->>'description',''),v_row->>'priority',nullif(v_row->>'due_date','')::date,(v_profiles->>(v_row->>'assignee_id'))::uuid,(v_projects->>(v_row->>'project_id'))::uuid,v_row->>'status',(v_profiles->>(v_row->>'created_by'))::uuid,(v_row->>'created_at')::timestamptz,(v_row->>'updated_at')::timestamptz,(v_row->>'completed_at')::timestamptz,coalesce((v_row->>'weight')::int,1)) returning id into v_id;
+   v_tasks:=v_tasks||jsonb_build_object(v_row->>'id',v_id);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'events') loop
+   insert into public.tm_events(company_id,task_id,actor_id,actor_name,actor_role,action,from_status,to_status,note,created_at)
+   values(p_id,(v_tasks->>(v_row->>'task_id'))::uuid,(v_profiles->>(v_row->>'actor_id'))::uuid,v_row->>'actor_name',v_row->>'actor_role',v_row->>'action',v_row->>'from_status',v_row->>'to_status',coalesce(v_row->>'note',''),(v_row->>'created_at')::timestamptz);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'files') loop
+   v_path:=(v_tasks->>(v_row->>'task_id'))||'/'||gen_random_uuid()::text||case when v_row->>'mime'='application/pdf' then '.pdf' else '.jpg' end;
+   insert into public.tm_files(company_id,task_id,path,name,mime,size,uploaded_by,uploader_name,created_at)
+   values(p_id,(v_tasks->>(v_row->>'task_id'))::uuid,v_path,v_row->>'name',v_row->>'mime',(v_row->>'size')::int,(v_profiles->>(v_row->>'uploaded_by'))::uuid,v_row->>'uploader_name',(v_row->>'created_at')::timestamptz);
+   v_paths:=v_paths||jsonb_build_array(jsonb_build_object('bucket','tareas','old_path',v_row->>'path','path',v_path));
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'tasks') loop
+   update public.tm_tasks set archived_at=(v_row->>'archived_at')::timestamptz where id=(v_tasks->>(v_row->>'id'))::uuid;
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'clients') loop
+   insert into public.tm_project_clients(company_id,project_id,profile_id) values(p_id,(v_projects->>(v_row->>'project_id'))::uuid,(v_profiles->>(v_row->>'profile_id'))::uuid);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'templates') loop
+   insert into public.tm_templates(company_id,name,title,description,priority,weight) values(p_id,v_row->>'name',v_row->>'title',v_row->>'description',v_row->>'priority',(v_row->>'weight')::int);
+ end loop;
+ if p_backup->'company'->>'logo_path' is not null then
+   v_paths:=v_paths||jsonb_build_array(jsonb_build_object('bucket','empresas','old_path',p_backup->'company'->>'logo_path','path',p_id::text||'/logo.jpg'));
+   update public.tm_companies set logo_path=p_id::text||'/logo.jpg' where id=p_id;
+ end if;
+ insert into private.tm_restore_jobs(company_id,created_by,digest,paths) values(p_id,v_uid,v_digest,v_paths);
+ return jsonb_build_object('company_id',p_id,'paths',v_paths,'finished',false);
+end $$;
+create or replace function public.tm_restore_company(p_id uuid,p_backup jsonb)
+returns jsonb language sql security invoker set search_path='' as $$ select private.tm_restore_company(p_id,p_backup); $$;
+
+create or replace function private.tm_restore_can_write(p_bucket text,p_path text)
+returns boolean language sql stable security definer set search_path='' as $$
+ select private.tm_is_admin() and exists(select 1 from private.tm_restore_jobs j cross join lateral jsonb_array_elements(j.paths) p
+ where j.company_id=private.tm_company_id() and j.created_by=auth.uid() and not j.finished and p->>'bucket'=p_bucket and p->>'path'=p_path);
+$$;
+create policy tareas_restore_insert on storage.objects for insert to authenticated with check(private.tm_restore_can_write(bucket_id,name));
+
+create or replace function private.tm_finish_restore(p_id uuid)
+returns void language plpgsql security definer set search_path='' as $$
+declare v_job private.tm_restore_jobs;
+begin
+ select * into v_job from private.tm_restore_jobs where company_id=p_id and created_by=auth.uid() for update;
+ if not found then raise exception 'permiso'; end if;
+ if exists(select 1 from jsonb_array_elements(v_job.paths) p where not exists(select 1 from storage.objects o where o.bucket_id=p->>'bucket' and o.name=p->>'path')) then raise exception 'archivo'; end if;
+ update private.tm_restore_jobs set finished=true where company_id=p_id;
+end $$;
+create or replace function public.tm_finish_restore(p_id uuid)
+returns void language sql security invoker set search_path='' as $$ select private.tm_finish_restore(p_id); $$;
+revoke all on function private.tm_export_company(),public.tm_export_company(),private.tm_restore_company(uuid,jsonb),public.tm_restore_company(uuid,jsonb),private.tm_restore_can_write(text,text),private.tm_finish_restore(uuid),public.tm_finish_restore(uuid) from public,anon;
+grant execute on function private.tm_export_company(),public.tm_export_company(),private.tm_restore_company(uuid,jsonb),public.tm_restore_company(uuid,jsonb),private.tm_restore_can_write(text,text),private.tm_finish_restore(uuid),public.tm_finish_restore(uuid) to authenticated;
+notify pgrst,'reload schema';
+
+-- PARTE 12
+-- Busqueda parcial compatible y recuperacion desde otra cuenta del equipo.
+create or replace function public.tm_search_tasks(p_filter jsonb,p_offset int default 0,p_limit int default 30)
+returns jsonb language sql stable security invoker set search_path='' as $$
+ with filtered as (
+ select t.* from public.tm_tasks t
+ where archived_at is null
+ and (coalesce(p_filter->>'q','')='' or to_tsvector('spanish',title || ' ' || description) @@ plainto_tsquery('spanish',p_filter->>'q') or position(translate(lower(p_filter->>'q'),'áéíóúüñ','aeiouun') in translate(lower(title || ' ' || description || ' T-' || lpad(number::text,greatest(3,length(number::text)),'0')),'áéíóúüñ','aeiouun'))>0 or number::text=ltrim(regexp_replace(upper(p_filter->>'q'),'^T-?',''),'0'))
+ and (coalesce(p_filter->>'project','')='' or (p_filter->>'project'='ninguna' and project_id is null) or project_id::text=p_filter->>'project')
+ and (coalesce(p_filter->>'assignee','')='' or (p_filter->>'assignee'='nadie' and assignee_id is null) or assignee_id::text=p_filter->>'assignee')
+ and (coalesce(p_filter->>'priority','')='' or priority=p_filter->>'priority')
+ and (coalesce(p_filter->>'status','')='' or status=p_filter->>'status')
+ and (coalesce(p_filter->>'view','todas')='todas' or (p_filter->>'view'='abiertas' and status<>'completada') or (p_filter->>'view'='completadas' and status='completada'))
+ and (not coalesce((p_filter->>'overdue')::boolean,false) or (due_date < (now() at time zone 'America/Bogota')::date and status<>'completada'))
+ and (coalesce(p_filter->>'from','')='' or due_date >= (p_filter->>'from')::date)
+ and (coalesce(p_filter->>'to','')='' or due_date <= (p_filter->>'to')::date)
+ ), page as (select * from filtered order by due_date nulls last,number desc limit greatest(1,least(coalesce(p_limit,30),100)) offset greatest(0,coalesce(p_offset,0)))
+ select jsonb_build_object('total',(select count(*) from filtered),'rows',coalesce((select jsonb_agg(to_jsonb(page)) from page),'[]'::jsonb));
+$$;
+
+create or replace function private.tm_restore_company(p_id uuid,p_backup jsonb)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+ v_uid uuid:=auth.uid(); v_admin uuid; v_row jsonb; v_id uuid; v_owner text:=p_backup->>'owner_profile_id';
+ v_profiles jsonb:='{}'; v_projects jsonb:='{}'; v_tasks jsonb:='{}'; v_paths jsonb:='[]';
+ v_job private.tm_restore_jobs; v_digest text:=md5(p_backup::text); v_path text;
+begin
+ if v_uid is null or coalesce((auth.jwt()->>'is_anonymous')::boolean,false) then raise exception 'sesion'; end if;
+ if not exists(select 1 from auth.users where id=v_uid and email_confirmed_at is not null) then raise exception 'confirmar'; end if;
+ perform pg_advisory_xact_lock(hashtextextended(p_id::text,0));
+ select * into v_job from private.tm_restore_jobs where company_id=p_id;
+ if found then
+   if v_job.created_by<>v_uid or v_job.digest<>v_digest then raise exception 'permiso'; end if;
+   return jsonb_build_object('company_id',p_id,'paths',v_job.paths,'finished',v_job.finished);
+ end if;
+ if (p_backup->>'version')::int<>1 or octet_length(p_backup::text)>30000000 or jsonb_array_length(p_backup->'tasks')>10000 or jsonb_array_length(p_backup->'profiles')>2000 or jsonb_array_length(p_backup->'files')>10000 then raise exception 'archivo'; end if;
+ if exists(select 1 from public.tm_companies where id=p_id) then raise exception 'duplicado'; end if;
+ if not exists(select 1 from jsonb_array_elements(p_backup->'profiles') p where p->>'id'=v_owner and p->>'role'='admin') then raise exception 'archivo'; end if;
+ perform public.tm_create_company(p_id,left(p_backup->'company'->>'name',65)||' (recuperada)','Administrador');
+ perform set_config('request.headers',jsonb_build_object('x-trazo-company',p_id)::text,true);
+ select id into v_admin from public.tm_profiles where company_id=p_id and user_id=v_uid;
+ v_profiles:=jsonb_build_object(v_owner,v_admin);
+ update public.tm_companies set contact=coalesce(p_backup->'company'->>'contact',''),phone=coalesce(p_backup->'company'->>'phone','') where id=p_id;
+ for v_row in select value from jsonb_array_elements(p_backup->'profiles') loop
+   if v_row->>'id'=v_owner then
+     update public.tm_profiles set name=v_row->>'name' where id=v_admin;
+   elsif lower(v_row->>'email')=(select lower(email) from auth.users where id=v_uid) then
+     v_profiles:=v_profiles||jsonb_build_object(v_row->>'id',v_admin);
+   else
+     insert into public.tm_profiles(company_id,name,email,role,active,invite_code,invite_expires_at)
+     values(p_id,v_row->>'name',v_row->>'email',v_row->>'role',coalesce((v_row->>'active')::boolean,true),private.tm_code(),now()+private.tm_invite_ttl()) returning id into v_id;
+     v_profiles:=v_profiles||jsonb_build_object(v_row->>'id',v_id);
+   end if;
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'projects') loop
+   insert into public.tm_projects(company_id,name,detail,active) values(p_id,v_row->>'name',coalesce(v_row->>'detail',''),(v_row->>'active')::boolean) returning id into v_id;
+   v_projects:=v_projects||jsonb_build_object(v_row->>'id',v_id);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'tasks') order by (value->>'number')::int loop
+   insert into public.tm_tasks(company_id,title,description,priority,due_date,assignee_id,project_id,status,created_by,created_at,updated_at,completed_at,weight)
+   values(p_id,v_row->>'title',coalesce(v_row->>'description',''),v_row->>'priority',nullif(v_row->>'due_date','')::date,(v_profiles->>(v_row->>'assignee_id'))::uuid,(v_projects->>(v_row->>'project_id'))::uuid,v_row->>'status',(v_profiles->>(v_row->>'created_by'))::uuid,(v_row->>'created_at')::timestamptz,(v_row->>'updated_at')::timestamptz,(v_row->>'completed_at')::timestamptz,coalesce((v_row->>'weight')::int,1)) returning id into v_id;
+   v_tasks:=v_tasks||jsonb_build_object(v_row->>'id',v_id);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'events') loop
+   insert into public.tm_events(company_id,task_id,actor_id,actor_name,actor_role,action,from_status,to_status,note,created_at)
+   values(p_id,(v_tasks->>(v_row->>'task_id'))::uuid,(v_profiles->>(v_row->>'actor_id'))::uuid,v_row->>'actor_name',v_row->>'actor_role',v_row->>'action',v_row->>'from_status',v_row->>'to_status',coalesce(v_row->>'note',''),(v_row->>'created_at')::timestamptz);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'files') loop
+   v_path:=(v_tasks->>(v_row->>'task_id'))||'/'||gen_random_uuid()::text||case when v_row->>'mime'='application/pdf' then '.pdf' else '.jpg' end;
+   insert into public.tm_files(company_id,task_id,path,name,mime,size,uploaded_by,uploader_name,created_at)
+   values(p_id,(v_tasks->>(v_row->>'task_id'))::uuid,v_path,v_row->>'name',v_row->>'mime',(v_row->>'size')::int,(v_profiles->>(v_row->>'uploaded_by'))::uuid,v_row->>'uploader_name',(v_row->>'created_at')::timestamptz);
+   v_paths:=v_paths||jsonb_build_array(jsonb_build_object('bucket','tareas','old_path',v_row->>'path','path',v_path));
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'tasks') loop
+   update public.tm_tasks set archived_at=(v_row->>'archived_at')::timestamptz where id=(v_tasks->>(v_row->>'id'))::uuid;
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'clients') loop
+   insert into public.tm_project_clients(company_id,project_id,profile_id) values(p_id,(v_projects->>(v_row->>'project_id'))::uuid,(v_profiles->>(v_row->>'profile_id'))::uuid);
+ end loop;
+ for v_row in select value from jsonb_array_elements(p_backup->'templates') loop
+   insert into public.tm_templates(company_id,name,title,description,priority,weight) values(p_id,v_row->>'name',v_row->>'title',v_row->>'description',v_row->>'priority',(v_row->>'weight')::int);
+ end loop;
+ if p_backup->'company'->>'logo_path' is not null then
+   v_paths:=v_paths||jsonb_build_array(jsonb_build_object('bucket','empresas','old_path',p_backup->'company'->>'logo_path','path',p_id::text||'/logo.jpg'));
+   update public.tm_companies set logo_path=p_id::text||'/logo.jpg' where id=p_id;
+ end if;
+ insert into private.tm_restore_jobs(company_id,created_by,digest,paths) values(p_id,v_uid,v_digest,v_paths);
+ return jsonb_build_object('company_id',p_id,'paths',v_paths,'finished',false);
+end $$;
+
+notify pgrst,'reload schema';
+
+-- PARTE 13 · Orden de tareas completadas
+-- Conservar el orden de las tareas completadas por su fecha de cierre.
+-- Busqueda parcial compatible y recuperacion desde otra cuenta del equipo.
+create or replace function public.tm_search_tasks(p_filter jsonb,p_offset int default 0,p_limit int default 30)
+returns jsonb language sql stable security invoker set search_path='' as $$
+ with filtered as (
+ select t.* from public.tm_tasks t
+ where archived_at is null
+ and (coalesce(p_filter->>'q','')='' or to_tsvector('spanish',title || ' ' || description) @@ plainto_tsquery('spanish',p_filter->>'q') or position(translate(lower(p_filter->>'q'),'áéíóúüñ','aeiouun') in translate(lower(title || ' ' || description || ' T-' || lpad(number::text,greatest(3,length(number::text)),'0')),'áéíóúüñ','aeiouun'))>0 or number::text=ltrim(regexp_replace(upper(p_filter->>'q'),'^T-?',''),'0'))
+ and (coalesce(p_filter->>'project','')='' or (p_filter->>'project'='ninguna' and project_id is null) or project_id::text=p_filter->>'project')
+ and (coalesce(p_filter->>'assignee','')='' or (p_filter->>'assignee'='nadie' and assignee_id is null) or assignee_id::text=p_filter->>'assignee')
+ and (coalesce(p_filter->>'priority','')='' or priority=p_filter->>'priority')
+ and (coalesce(p_filter->>'status','')='' or status=p_filter->>'status')
+ and (coalesce(p_filter->>'view','todas')='todas' or (p_filter->>'view'='abiertas' and status<>'completada') or (p_filter->>'view'='completadas' and status='completada'))
+ and (not coalesce((p_filter->>'overdue')::boolean,false) or (due_date < (now() at time zone 'America/Bogota')::date and status<>'completada'))
+ and (coalesce(p_filter->>'from','')='' or due_date >= (p_filter->>'from')::date)
+ and (coalesce(p_filter->>'to','')='' or due_date <= (p_filter->>'to')::date)
+ ), page as (select * from filtered order by case when p_filter->>'view'='completadas' then completed_at end desc nulls last, case when coalesce(p_filter->>'view','')<>'completadas' then due_date end nulls last,number desc limit greatest(1,least(coalesce(p_limit,30),100)) offset greatest(0,coalesce(p_offset,0)))
+ select jsonb_build_object('total',(select count(*) from filtered),'rows',coalesce((select jsonb_agg(to_jsonb(page)) from page),'[]'::jsonb));
+$$;
+
+notify pgrst,'reload schema';

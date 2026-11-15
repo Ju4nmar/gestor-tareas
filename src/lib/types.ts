@@ -2,7 +2,25 @@
 export type Rol = "admin" | "empleado" | "cliente";
 
 /** Acceso de la cuenta a una empresa. El rol pertenece a esta membresía. */
-export type Empresa = { id: string; nombre: string; perfilId: string; rol: Rol };
+export type Empresa = {
+  id: string;
+  nombre: string;
+  perfilId: string;
+  rol: Rol;
+  contacto?: string;
+  telefono?: string;
+  logo?: string | null;
+  logoUrl?: string;
+};
+
+export type Plantilla = {
+  id: string;
+  nombre: string;
+  titulo: string;
+  descripcion: string;
+  prioridad: Prioridad;
+  peso: number;
+};
 
 /** Estados de una tarea, en el orden del flujo. */
 export type Estado =
@@ -87,6 +105,7 @@ export type Archivo = {
 };
 
 export type Tarea = {
+  peso?: number;
   id: string;
   numero: number;
   titulo: string;
@@ -123,6 +142,7 @@ export type Etapa = "pendiente" | "en_proceso" | "terminada";
 
 /** Lo que un cliente ve de una tarea. */
 export type TareaCliente = {
+  peso?: number;
   id: string;
   numero: number;
   titulo: string;
@@ -138,7 +158,7 @@ export type ObraCliente = Obra & { tareas: TareaCliente[]; archivos: Archivo[] }
 export type ClienteObra = { obraId: string; perfilId: string };
 
 /** Campos que el administrador llena al crear o editar una tarea. */
-export type DatosTarea = Pick<Tarea, "titulo" | "descripcion" | "prioridad" | "vence" | "asignadaA" | "obraId">;
+export type DatosTarea = Pick<Tarea, "titulo" | "descripcion" | "prioridad" | "vence" | "asignadaA" | "obraId" | "peso">;
 
 /** Claves de error que devuelve la base de datos (ver supabase/schema.sql). */
 export type Fallo =

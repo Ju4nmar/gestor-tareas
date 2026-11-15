@@ -3,6 +3,8 @@
 import type { Session } from "@supabase/supabase-js";
 import { useSyncExternalStore } from "react";
 import * as demo from "./demo";
+import { rutaArchivo } from "./ruta-archivo";
+import { limpiarBorradoresCuenta } from "./borradores";
 import { SOLO_DEMO } from "./entorno";
 import { fechaLocal } from "./fechas";
 import { ErrorFlujo } from "./flujo";
@@ -20,6 +22,7 @@ import type {
   Obra,
   ObraCliente,
   Perfil,
+  Plantilla,
   Rol,
   Tarea,
 } from "./types";
@@ -37,6 +40,9 @@ export type State = {
   empresas: Empresa[];
   empresa: Empresa | null;
   ocupado: boolean;
+  plantillas: Plantilla[];
+  vistoHasta: string | null;
+  operacion: string | null;
   /** Perfil activo de quien usa la aplicación; nulo si no ha entrado o no tiene acceso. */
   perfil: Perfil | null;
   desactivada: boolean;
@@ -64,6 +70,9 @@ const initial: State = {
   empresas: [],
   empresa: null,
   ocupado: false,
+  plantillas: [],
+  vistoHasta: null,
+  operacion: null,
   perfil: null,
   desactivada: false,
   demo: false,
@@ -150,13 +159,23 @@ function ponerDemo(b: demo.Base) {
     desactivada: false,
     cargado: true,
     error: false,
+    plantillas: admin ? (b.plantillas ?? []) : [],
+    vistoHasta: b.vistos?.[b.yo] ?? null,
     empresas: [],
-    empresa: null,
+    empresa: {
+      id: "demo",
+      nombre: b.empresa?.nombre ?? "Constructora Demo",
+      perfilId: b.yo,
+      rol: yo?.rol ?? "empleado",
+      ...b.empresa,
+    },
     tareas,
     archivadas,
     eventos: b.eventos.filter((e) => visibles.has(e.tareaId)),
     perfiles: admin ? b.perfiles : b.perfiles.filter((p) => p.id === b.yo),
-    obras: admin ? b.obras : b.obras.filter((o) => tareas.some((t) => t.obraId === o.id)),
+    obras: admin
+      ? b.obras
+      : b.obras.filter((o) => tareas.some((t) => t.obraId === o.id)),
     archivos: b.archivos.filter((a) => visibles.has(a.tareaId)),
     clientes: admin ? b.clientes : [],
     seguimiento: yo?.rol === "cliente" ? demo.vistaCliente(b) : [],
@@ -180,7 +199,8 @@ export function verComo(perfilId: string) {
 }
 
 /** Personas con las que se puede mirar la muestra. */
-export const personasDemo = () => base?.perfiles.filter((p) => p.userId && p.activo) ?? [];
+export const personasDemo = () =>
+  base?.perfiles.filter((p) => p.userId && p.activo) ?? [];
 
 export function salirDemo() {
   try {
@@ -232,6 +252,7 @@ type FilaTarea = {
   updated_at: string;
   completed_at: string | null;
   archived_at: string | null;
+  weight?: number;
 };
 
 const aTarea = (f: FilaTarea): Tarea => ({
@@ -248,6 +269,7 @@ const aTarea = (f: FilaTarea): Tarea => ({
   actualizada: f.updated_at,
   completada: f.completed_at,
   archivada: f.archived_at,
+  peso: f.weight ?? 1,
 });
 
 type FilaEvento = {
@@ -278,7 +300,12 @@ const aEvento = (f: FilaEvento): Evento => ({
 
 type FilaObra = { id: string; name: string; detail: string; active: boolean };
 
-const aObra = (f: FilaObra): Obra => ({ id: f.id, nombre: f.name, detalle: f.detail, activa: f.active });
+const aObra = (f: FilaObra): Obra => ({
+  id: f.id,
+  nombre: f.name,
+  detalle: f.detail,
+  activa: f.active,
+});
 
 type FilaArchivo = {
   id: string;
@@ -305,8 +332,23 @@ const aArchivo = (f: FilaArchivo): Archivo => ({
 });
 
 type FilaSeguimiento = FilaObra & {
-  tasks: { id: string; number: number; title: string; stage: Etapa; due_date: string | null; completed_at: string | null }[];
-  files: { id: string; task_id: string; path: string; name: string; mime: string; created_at: string }[];
+  tasks: {
+    id: string;
+    number: number;
+    title: string;
+    stage: Etapa;
+    due_date: string | null;
+    completed_at: string | null;
+    weight?: number;
+  }[];
+  files: {
+    id: string;
+    task_id: string;
+    path: string;
+    name: string;
+    mime: string;
+    created_at: string;
+  }[];
 };
 
 const aSeguimiento = (f: FilaSeguimiento): ObraCliente => ({
@@ -318,6 +360,7 @@ const aSeguimiento = (f: FilaSeguimiento): ObraCliente => ({
     etapa: t.stage,
     vence: t.due_date,
     completada: t.completed_at,
+    peso: t.weight ?? 1,
   })),
   archivos: f.files.map((a) => ({
     id: a.id,
@@ -332,41 +375,154 @@ const aSeguimiento = (f: FilaSeguimiento): ObraCliente => ({
   })),
 });
 
+/** Recorre paginas estables para evitar el limite de filas de la API. */
+async function leerPaginas<T>(
+  tabla: string,
+  columnas = "*",
+  orden = "id",
+  ascending = true,
+) {
+  const filas: T[] = [];
+  const vistas = new Set<string>();
+  const esperada = revision;
+  for (let inicio = 0; ; inicio += 500) {
+    if (esperada !== revision)
+      return { data: filas, error: new ErrorFlujo("empresa_cambio") };
+    const consulta = supabase
+      .from(tabla)
+      .select(columnas)
+      .order(orden, { ascending });
+    const resultado = await consulta
+      .order(tabla === "tm_project_clients" ? "profile_id" : "id")
+      .range(inicio, inicio + 499);
+    if (resultado.error) return { data: filas, error: resultado.error };
+    for (const fila of resultado.data as unknown as T[]) {
+      const campos = fila as Record<string, unknown>;
+      const clave = String(
+        campos.id ?? `${campos.project_id}:${campos.profile_id}`,
+      );
+      if (!vistas.has(clave)) {
+        vistas.add(clave);
+        filas.push(fila);
+      }
+    }
+    if (resultado.data.length < 500) return { data: filas, error: null };
+  }
+}
+
+async function cargarComplementos(esperada: number) {
+  const [plantillas, marcador, empresa] = await Promise.all([
+    leerPaginas<{
+      id: string;
+      name: string;
+      title: string;
+      description: string;
+      priority: Plantilla["prioridad"];
+      weight: number;
+    }>("tm_templates"),
+    supabase.from("tm_read_markers").select("seen_at").maybeSingle(),
+    supabase
+      .from("tm_companies")
+      .select("id,name,contact,phone,logo_path")
+      .eq("id", state.empresa!.id)
+      .single(),
+  ]);
+  if (esperada !== revision) return;
+  if (plantillas.error || marcador.error || empresa.error)
+    throw new ErrorFlujo("error");
+  let logoUrl: string | undefined;
+  if (empresa.data.logo_path) {
+    const logo = await supabase.storage
+      .from("empresas")
+      .createSignedUrl(empresa.data.logo_path, 3600);
+    logoUrl = logo.data?.signedUrl;
+  }
+  if (esperada !== revision) return;
+  set({
+    plantillas: plantillas.data.map((p) => ({
+      id: p.id,
+      nombre: p.name,
+      titulo: p.title,
+      descripcion: p.description,
+      prioridad: p.priority,
+      peso: p.weight,
+    })),
+    vistoHasta: marcador.data?.seen_at ?? null,
+    empresa: {
+      ...state.empresa!,
+      nombre: empresa.data.name,
+      contacto: empresa.data.contact,
+      telefono: empresa.data.phone,
+      logo: empresa.data.logo_path,
+      logoUrl,
+    },
+    empresas: state.empresas.map((e) =>
+      e.id === empresa.data.id ? { ...e, nombre: empresa.data.name } : e,
+    ),
+  });
+}
+
 /** Trae tareas, historial, equipo, obras y archivos. La base de datos entrega solo lo que esa persona puede ver. */
 export async function recargar() {
   if (state.demo || !state.perfil) return;
   const consultaRevision = revision;
+  let complementosOk = true;
+  try {
+    await cargarComplementos(consultaRevision);
+  } catch {
+    complementosOk = false;
+    if (consultaRevision === revision) set({ error: true });
+  }
+  if (consultaRevision !== revision) return;
   if (state.perfil.rol === "cliente") {
     // El cliente no lee las tablas: una función le arma el resumen de sus obras.
     const { data, error } = await supabase.rpc("tm_client_view");
     if (consultaRevision !== revision) return;
     if (error) return set({ cargado: true, error: true });
-    return set({ cargado: true, error: false, seguimiento: ((data ?? []) as FilaSeguimiento[]).map(aSeguimiento) });
+    return set({
+      cargado: true,
+      error: !complementosOk,
+      seguimiento: ((data ?? []) as FilaSeguimiento[]).map(aSeguimiento),
+    });
   }
-  const [tareas, eventos, perfiles, obras, archivos, clientes] = await Promise.all([
-    supabase.from("tm_tasks").select("*").order("number", { ascending: false }),
-    supabase.from("tm_events").select("*").order("id", { ascending: false }).limit(3000),
-    supabase.from("tm_profiles").select("*").order("name"),
-    supabase.from("tm_projects").select("*").order("created_at"),
-    supabase.from("tm_files").select("*").order("created_at", { ascending: false }),
-    supabase.from("tm_project_clients").select("project_id, profile_id"),
-  ]);
+  const [tareas, eventos, perfiles, obras, archivos, clientes] =
+    await Promise.all([
+      leerPaginas<FilaTarea>("tm_tasks", "*", "number", false),
+      leerPaginas<FilaEvento>("tm_events", "*", "id", false),
+      leerPaginas<FilaPerfil>("tm_profiles"),
+      leerPaginas<FilaObra>("tm_projects", "*", "created_at"),
+      leerPaginas<FilaArchivo>("tm_files", "*", "created_at", false),
+      leerPaginas<{ project_id: string; profile_id: string }>(
+        "tm_project_clients",
+        "project_id,profile_id",
+        "project_id",
+      ),
+    ]);
   if (consultaRevision !== revision) return;
-  if (tareas.error || eventos.error || perfiles.error || obras.error || archivos.error || clientes.error) {
+  if (
+    tareas.error ||
+    eventos.error ||
+    perfiles.error ||
+    obras.error ||
+    archivos.error ||
+    clientes.error
+  ) {
     return set({ cargado: true, error: true });
   }
   // Las archivadas llegan solo al administrador (lo decide la base de datos) y van aparte.
   const filas = (tareas.data as FilaTarea[]).map(aTarea);
   set({
     cargado: true,
-    error: false,
+    error: !complementosOk,
     tareas: filas.filter((t) => !t.archivada),
     archivadas: filas.filter((t) => t.archivada),
     eventos: (eventos.data as FilaEvento[]).map(aEvento),
     perfiles: (perfiles.data as FilaPerfil[]).map(aPerfil),
     obras: (obras.data as FilaObra[]).map(aObra),
     archivos: (archivos.data as FilaArchivo[]).map(aArchivo),
-    clientes: (clientes.data as { project_id: string; profile_id: string }[]).map((c) => ({
+    clientes: (
+      clientes.data as { project_id: string; profile_id: string }[]
+    ).map((c) => ({
       obraId: c.project_id,
       perfilId: c.profile_id,
     })),
@@ -374,7 +530,12 @@ export async function recargar() {
 }
 
 type FilaEmpresa = { id: string; name: string; profile_id: string; role: Rol };
-const aEmpresa = (fila: FilaEmpresa): Empresa => ({ id: fila.id, nombre: fila.name, perfilId: fila.profile_id, rol: fila.role });
+const aEmpresa = (fila: FilaEmpresa): Empresa => ({
+  id: fila.id,
+  nombre: fila.name,
+  perfilId: fila.profile_id,
+  rol: fila.role,
+});
 
 function recordarEmpresa(id: string | null, email: string) {
   try {
@@ -407,7 +568,13 @@ export async function seleccionarEmpresa(id: string) {
     if (accesoRevision !== revision) return;
     seleccionarEmpresaApi(null);
     recordarEmpresa(null, email);
-    set({ listo: true, perfil: null, empresa: null, cargado: true, error: true });
+    set({
+      listo: true,
+      perfil: null,
+      empresa: null,
+      cargado: true,
+      error: true,
+    });
     throw error;
   }
 }
@@ -419,7 +586,10 @@ async function aplicarSesion(session: Session | null, preferida?: string) {
   seleccionarEmpresaApi(null);
   firmadas.clear();
   const email = session?.user.email ?? null;
-  const nombreCuenta = typeof session?.user.user_metadata.full_name === "string" ? session.user.user_metadata.full_name : "";
+  const nombreCuenta =
+    typeof session?.user.user_metadata.full_name === "string"
+      ? session.user.user_metadata.full_name
+      : "";
   set({ ...initial, email, nombreCuenta, ocupado: operacionesPendientes > 0 });
   if (!session) return set({ listo: true });
   try {
@@ -430,13 +600,20 @@ async function aplicarSesion(session: Session | null, preferida?: string) {
     set({ empresas });
     let guardada = preferida;
     try {
-      guardada ??= window.sessionStorage.getItem(`trazo-empresa:${email}`) ?? undefined;
-    } catch { /* La seleccion puede hacerse manualmente. */ }
-    const elegida = empresas.find((item) => item.id === guardada) ?? (empresas.length === 1 ? empresas[0] : undefined);
-    if (elegida && operacionesPendientes === 0) await seleccionarEmpresa(elegida.id);
+      guardada ??=
+        window.sessionStorage.getItem(`trazo-empresa:${email}`) ?? undefined;
+    } catch {
+      /* La seleccion puede hacerse manualmente. */
+    }
+    const elegida =
+      empresas.find((item) => item.id === guardada) ??
+      (empresas.length === 1 ? empresas[0] : undefined);
+    if (elegida && operacionesPendientes === 0)
+      await seleccionarEmpresa(elegida.id);
     else set({ listo: true });
   } catch {
-    if (accesoRevision === revision) set({ listo: true, cargado: true, error: true });
+    if (accesoRevision === revision)
+      set({ listo: true, cargado: true, error: true });
   }
 }
 
@@ -497,12 +674,18 @@ const FALLOS = new Set<string>([
 
 async function rpc<T>(nombre: string, args: Record<string, unknown>) {
   const { data, error } = await supabase.rpc(nombre, args);
-  if (error) throw new ErrorFlujo(FALLOS.has(error.message) ? (error.message as Fallo) : "error");
+  if (error)
+    throw new ErrorFlujo(
+      FALLOS.has(error.message) ? (error.message as Fallo) : "error",
+    );
   return data as T;
 }
 
 /** Ejecuta el cambio en la base de datos o en la muestra, y refresca lo que se ve. */
-async function cambiar<T>(real: () => Promise<T>, enDemo: (b: demo.Base) => T): Promise<T> {
+async function cambiar<T>(
+  real: () => Promise<T>,
+  enDemo: (b: demo.Base) => T,
+): Promise<T> {
   if (state.demo && base) {
     const copia = structuredClone(base);
     const resultado = enDemo(copia);
@@ -522,11 +705,14 @@ function comprobarRevision(esperada: number) {
   if (esperada !== revision) throw new ErrorFlujo("empresa_cambio");
 }
 
-async function enOperacion<T>(operacion: () => Promise<T>): Promise<T> {
+export async function enOperacion<T>(operacion: () => Promise<T>): Promise<T> {
+  const esperada = revision;
   operacionesPendientes++;
   set({ ocupado: true });
   try {
-    return await operacion();
+    const resultado = await operacion();
+    comprobarRevision(esperada);
+    return resultado;
   } finally {
     operacionesPendientes--;
     set({ ocupado: operacionesPendientes > 0 });
@@ -534,17 +720,25 @@ async function enOperacion<T>(operacion: () => Promise<T>): Promise<T> {
 }
 
 /** Crea la tarea (sin `id`) o la edita. Devuelve su id. */
-export const guardarTarea = (datos: DatosTarea, id: string | null = null) =>
+export const guardarTarea = (
+  datos: DatosTarea,
+  id: string | null = null,
+  solicitud: string = crypto.randomUUID(),
+) =>
   cambiar(
     () =>
-      rpc<string>("tm_save_task", {
+      rpc<string>("tm_save_task_v2", {
         p_id: id,
-        p_title: datos.titulo,
-        p_description: datos.descripcion,
-        p_priority: datos.prioridad,
-        p_due: datos.vence,
-        p_assignee: datos.asignadaA,
-        p_project: datos.obraId,
+        p_request: solicitud,
+        p_data: {
+          title: datos.titulo,
+          description: datos.descripcion,
+          priority: datos.prioridad,
+          due_date: datos.vence,
+          assignee_id: datos.asignadaA,
+          project_id: datos.obraId,
+          weight: datos.peso ?? 1,
+        },
       }),
     (b) => demo.guardarTarea(b, datos, id),
   );
@@ -585,7 +779,12 @@ export const borrarTarea = (id: string) =>
 /** Da un paso del flujo (aceptar, enviar, aprobar…) o deja un comentario. */
 export const actuar = (id: string, accion: Accion, nota = "") =>
   cambiar(
-    () => rpc<string>("tm_act", { p_task: id, p_action: accion, p_note: nota }).then(() => undefined),
+    () =>
+      rpc<string>("tm_act", {
+        p_task: id,
+        p_action: accion,
+        p_note: nota,
+      }).then(() => undefined),
     (b) => demo.actuar(b, id, accion, nota),
   );
 
@@ -593,15 +792,28 @@ export const actuar = (id: string, accion: Accion, nota = "") =>
 export const invitar = (nombre: string, email: string, rol: Rol) =>
   cambiar(
     () =>
-      rpc<FilaPerfil>("tm_invite", { p_name: nombre, p_email: email, p_role: rol }).then(
-        (fila) => fila.invite_code ?? "",
-      ),
+      rpc<FilaPerfil>("tm_invite", {
+        p_name: nombre,
+        p_email: email,
+        p_role: rol,
+      }).then((fila) => fila.invite_code ?? ""),
     (b) => demo.invitar(b, nombre, email, rol),
   );
 
-export const actualizarPerfil = (id: string, nombre: string, rol: Rol, activo: boolean) =>
+export const actualizarPerfil = (
+  id: string,
+  nombre: string,
+  rol: Rol,
+  activo: boolean,
+) =>
   cambiar(
-    () => rpc<void>("tm_update_profile", { p_id: id, p_name: nombre, p_role: rol, p_active: activo }),
+    () =>
+      rpc<void>("tm_update_profile", {
+        p_id: id,
+        p_name: nombre,
+        p_role: rol,
+        p_active: activo,
+      }),
     (b) => demo.actualizarPerfil(b, id, nombre, rol, activo),
   );
 
@@ -611,7 +823,10 @@ export const actualizarPerfil = (id: string, nombre: string, rol: Rol, activo: b
  */
 export const renovarInvitacion = (id: string) =>
   cambiar(
-    () => rpc<FilaPerfil>("tm_renew_invite", { p_id: id }).then((fila) => fila.invite_code ?? ""),
+    () =>
+      rpc<FilaPerfil>("tm_renew_invite", { p_id: id }).then(
+        (fila) => fila.invite_code ?? "",
+      ),
     (b) => demo.renovarInvitacion(b, id),
   );
 
@@ -622,9 +837,20 @@ export const quitarInvitacion = (id: string) =>
   );
 
 /** Crea la obra (sin `id`) o cambia su nombre, detalle o estado. */
-export const guardarObra = (id: string | null, nombre: string, detalle: string, activa = true) =>
+export const guardarObra = (
+  id: string | null,
+  nombre: string,
+  detalle: string,
+  activa = true,
+) =>
   cambiar(
-    () => rpc<string>("tm_save_project", { p_id: id, p_name: nombre, p_detail: detalle, p_active: activa }),
+    () =>
+      rpc<string>("tm_save_project", {
+        p_id: id,
+        p_name: nombre,
+        p_detail: detalle,
+        p_active: activa,
+      }),
     (b) => demo.guardarObra(b, id, nombre, detalle, activa),
   );
 
@@ -641,15 +867,18 @@ export const borrarObra = (id: string) =>
 export const invitarCliente = (obraId: string, nombre: string, email: string) =>
   cambiar(
     () =>
-      rpc<FilaPerfil>("tm_invite_client", { p_project: obraId, p_name: nombre, p_email: email }).then(
-        (fila) => fila.invite_code ?? "",
-      ),
+      rpc<FilaPerfil>("tm_invite_client", {
+        p_project: obraId,
+        p_name: nombre,
+        p_email: email,
+      }).then((fila) => fila.invite_code ?? ""),
     (b) => demo.invitarCliente(b, obraId, nombre, email),
   );
 
 export const quitarCliente = (obraId: string, perfilId: string) =>
   cambiar(
-    () => rpc<void>("tm_remove_client", { p_project: obraId, p_profile: perfilId }),
+    () =>
+      rpc<void>("tm_remove_client", { p_project: obraId, p_profile: perfilId }),
     (b) => demo.quitarCliente(b, obraId, perfilId),
   );
 
@@ -665,7 +894,11 @@ const PESO_MAXIMO = 15 * 1024 * 1024;
 async function preparar(file: File, lado: number) {
   if (file.type === "application/pdf") {
     if (file.size > PESO_MAXIMO) throw new ErrorFlujo("archivo_grande");
-    return { blob: file as Blob, nombre: file.name, tipo: file.type };
+    return {
+      blob: file as Blob,
+      nombre: file.name.slice(0, 200),
+      tipo: file.type,
+    };
   }
   if (!file.type.startsWith("image/")) throw new ErrorFlujo("archivo_tipo");
   const blob = await new Promise<Blob>((resolve, reject) => {
@@ -675,14 +908,24 @@ async function preparar(file: File, lado: number) {
       const lienzo = document.createElement("canvas");
       lienzo.width = Math.round(img.width * escala);
       lienzo.height = Math.round(img.height * escala);
-      lienzo.getContext("2d")!.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      lienzo
+        .getContext("2d")!
+        .drawImage(img, 0, 0, lienzo.width, lienzo.height);
       URL.revokeObjectURL(img.src);
-      lienzo.toBlob((b) => (b ? resolve(b) : reject(new ErrorFlujo("archivo_tipo"))), "image/jpeg", 0.82);
+      lienzo.toBlob(
+        (b) => (b ? resolve(b) : reject(new ErrorFlujo("archivo_tipo"))),
+        "image/jpeg",
+        0.82,
+      );
     };
     img.onerror = () => reject(new ErrorFlujo("archivo_tipo"));
     img.src = URL.createObjectURL(file);
   });
-  return { blob, nombre: file.name.replace(/\.[^.]+$/, "") + ".jpg", tipo: "image/jpeg" };
+  return {
+    blob,
+    nombre: file.name.replace(/\.[^.]+$/, "").slice(0, 196) + ".jpg",
+    tipo: "image/jpeg",
+  };
 }
 
 const comoDataUrl = (blob: Blob) =>
@@ -694,38 +937,99 @@ const comoDataUrl = (blob: Blob) =>
   });
 
 /** Sube fotos o PDF y los deja adjuntos a la tarea. */
-export async function subirArchivos(tareaId: string, files: File[]) {
-  return enOperacion(() => subirArchivosEnEmpresa(tareaId, files));
+export type ProgresoArchivo = {
+  indice: number;
+  total: number;
+  nombre: string;
+  estado: "preparando" | "subiendo" | "guardado" | "error";
+};
+const intentosArchivo = new WeakMap<
+  File,
+  { revision: number; tarea: string; ruta: string; guardado: boolean }
+>();
+
+export async function subirArchivos(
+  tareaId: string,
+  files: File[],
+  progreso?: (estado: ProgresoArchivo) => void,
+) {
+  return enOperacion(() => subirArchivosEnEmpresa(tareaId, files, progreso));
 }
 
-async function subirArchivosEnEmpresa(tareaId: string, files: File[]) {
+async function subirArchivosEnEmpresa(
+  tareaId: string,
+  files: File[],
+  progreso?: (estado: ProgresoArchivo) => void,
+) {
   const operacionRevision = revision;
-  for (const file of files) {
+  let fallo: unknown;
+  for (const [indice, file] of files.entries()) {
     comprobarRevision(operacionRevision);
-    if (state.demo && base) {
-      // En la muestra la foto se guarda pequeña en la pestaña; un PDF solo queda con su nombre.
-      const { blob, nombre, tipo } = await preparar(file, 900);
-      const url = tipo === "image/jpeg" ? await comoDataUrl(blob) : undefined;
-      const copia = structuredClone(base);
-      demo.adjuntar(copia, tareaId, { nombre, tipo, peso: blob.size, url });
-      ponerDemo(copia);
+    const informar = (estado: ProgresoArchivo["estado"]) =>
+      progreso?.({ indice, total: files.length, nombre: file.name, estado });
+    let intento = intentosArchivo.get(file);
+    if (
+      !intento ||
+      intento.revision !== operacionRevision ||
+      intento.tarea !== tareaId
+    ) {
+      intento = {
+        revision: operacionRevision,
+        tarea: tareaId,
+        ruta: "",
+        guardado: false,
+      };
+      intentosArchivo.set(file, intento);
+    }
+    if (intento.guardado) {
+      informar("guardado");
       continue;
     }
-    const { blob, nombre, tipo } = await preparar(file, 1800);
-    comprobarRevision(operacionRevision);
-    const ruta = `${tareaId}/${crypto.randomUUID()}.${tipo === "image/jpeg" ? "jpg" : "pdf"}`;
-    const { error } = await supabase.storage.from(ALMACEN).upload(ruta, blob, { contentType: tipo });
-    if (error) throw new ErrorFlujo("archivo");
+    informar("preparando");
     try {
+      if (state.demo && base) {
+        // La muestra conserva las fotos reducidas y los documentos en esta pestaña.
+        const { blob, nombre, tipo } = await preparar(file, 900);
+        const url = await comoDataUrl(blob);
+        comprobarRevision(operacionRevision);
+        const copia = structuredClone(base);
+        if (!copia.archivos.some((a) => a.tareaId === tareaId && a.url === url))
+          demo.adjuntar(copia, tareaId, { nombre, tipo, peso: blob.size, url });
+        ponerDemo(copia);
+        intento.guardado = true;
+        informar("guardado");
+        continue;
+      }
+      const { blob, nombre, tipo } = await preparar(file, 1800);
       comprobarRevision(operacionRevision);
-      await rpc("tm_add_file", { p_task: tareaId, p_path: ruta, p_name: nombre, p_mime: tipo, p_size: blob.size });
+      intento.ruta ||= await rutaArchivo(tareaId, state.perfil!.id, blob, tipo);
+      comprobarRevision(operacionRevision);
+      const ruta = intento.ruta;
+      informar("subiendo");
+      const { error } = await supabase.storage
+        .from(ALMACEN)
+        .upload(ruta, blob, { contentType: tipo });
+      if (error && !/already exists|duplicate/i.test(error.message))
+        throw new ErrorFlujo("archivo");
+      comprobarRevision(operacionRevision);
+      await rpc("tm_add_file_v2", {
+        p_task: tareaId,
+        p_path: ruta,
+        p_name: nombre,
+        p_mime: tipo,
+        p_size: blob.size,
+      });
+      intento.guardado = true;
+      informar("guardado");
     } catch (e) {
-      // La base de datos no lo aceptó (por ejemplo, la tarea se archivó): no se deja suelto en el almacén.
-      await supabase.storage.from(ALMACEN).remove([ruta]);
-      throw e;
+      comprobarRevision(operacionRevision);
+      // La misma ruta permite resolver respuestas perdidas sin duplicar ni borrar un archivo confirmado.
+      fallo ??= e;
+      informar("error");
     }
   }
   await recargar();
+  if (fallo) throw fallo;
 }
 
 export const quitarArchivo = (id: string) =>
@@ -748,7 +1052,9 @@ const firmadas = new Map<string, { url: string; hasta: number }>();
 export async function urlsDe(archivos: Archivo[]) {
   const consultaRevision = revision;
   const ahora = Date.now();
-  const pendientes = archivos.filter((a) => !a.url && a.ruta && !((firmadas.get(a.ruta)?.hasta ?? 0) > ahora));
+  const pendientes = archivos.filter(
+    (a) => !a.url && a.ruta && !((firmadas.get(a.ruta)?.hasta ?? 0) > ahora),
+  );
   if (pendientes.length) {
     const { data } = await supabase.storage.from(ALMACEN).createSignedUrls(
       pendientes.map((a) => a.ruta),
@@ -756,23 +1062,34 @@ export async function urlsDe(archivos: Archivo[]) {
     );
     if (consultaRevision !== revision) return {};
     for (const f of data ?? []) {
-      if (f.path && f.signedUrl) firmadas.set(f.path, { url: f.signedUrl, hasta: ahora + 50 * 60_000 });
+      if (f.path && f.signedUrl)
+        firmadas.set(f.path, { url: f.signedUrl, hasta: ahora + 50 * 60_000 });
     }
   }
-  return Object.fromEntries(archivos.map((a) => [a.id, a.url ?? firmadas.get(a.ruta)?.url ?? ""]));
+  return Object.fromEntries(
+    archivos.map((a) => [a.id, a.url ?? firmadas.get(a.ruta)?.url ?? ""]),
+  );
 }
 
 // --- Cuenta -----------------------------------------------------------------
 
 export async function entrar(email: string, clave: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: clave });
-  if (error) throw new ErrorFlujo(error.code === "email_not_confirmed" ? "confirmar" : "credenciales");
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password: clave,
+  });
+  if (error)
+    throw new ErrorFlujo(
+      error.code === "email_not_confirmed" ? "confirmar" : "credenciales",
+    );
   await aplicarSesion(data.session);
 }
 
 export async function salir() {
+  const cuenta = state.perfil?.userId;
   const { error } = await supabase.auth.signOut();
   if (error) throw new ErrorFlujo("error");
+  if (cuenta) limpiarBorradoresCuenta(cuenta);
   await aplicarSesion(null);
 }
 
@@ -780,7 +1097,8 @@ export async function salir() {
  * Nombre y correo de una invitación pendiente; `{ vencida: true }` si su código ya venció
  * (no se revela a quién era); nulo si el código no sirve.
  */
-export type InfoInvitacion = { name: string; email: string; company: string } | { vencida: true } | null;
+export type InfoInvitacion =
+  { name: string; email: string; company: string } | { vencida: true } | null;
 
 export async function infoInvitacion(codigo: string): Promise<InfoInvitacion> {
   const { data } = await supabase.rpc("tm_invite_info", { p_code: codigo });
@@ -791,7 +1109,9 @@ export async function infoInvitacion(codigo: string): Promise<InfoInvitacion> {
 
 /** Une la sesión actual con su invitación y carga el perfil. */
 export async function activarConSesion(codigo: string) {
-  const perfil = await rpc<FilaPerfil & { company_id: string }>("tm_activate", { p_code: codigo });
+  const perfil = await rpc<FilaPerfil & { company_id: string }>("tm_activate", {
+    p_code: codigo,
+  });
   const { data } = await supabase.auth.getSession();
   await aplicarSesion(data.session, perfil.company_id);
 }
@@ -806,11 +1126,19 @@ export async function activar(codigo: string, email: string, clave: string) {
   const alta = await supabase.auth.signUp({
     email,
     password: clave,
-    options: { emailRedirectTo: `${window.location.origin}/activar?codigo=${encodeURIComponent(codigo)}` },
+    options: {
+      emailRedirectTo: `${window.location.origin}/activar?codigo=${encodeURIComponent(codigo)}`,
+    },
   });
-  if (alta.error) throw new ErrorFlujo(alta.error.code === "weak_password" ? "clave" : "error");
+  if (alta.error)
+    throw new ErrorFlujo(
+      alta.error.code === "weak_password" ? "clave" : "error",
+    );
   if (!alta.data.session) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password: clave });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: clave,
+    });
     if (error) throw new ErrorFlujo("confirmar");
   }
   await activarConSesion(codigo);
@@ -818,32 +1146,252 @@ export async function activar(codigo: string, email: string, clave: string) {
 
 /** Envía el correo para crear una contraseña nueva. */
 export async function pedirClave(email: string) {
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/restablecer` });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/restablecer`,
+  });
   if (error) throw new ErrorFlujo("error");
 }
 
 export async function cambiarClave(clave: string) {
   if (clave.length < 8) throw new ErrorFlujo("clave");
   const { error } = await supabase.auth.updateUser({ password: clave });
-  if (error) throw new ErrorFlujo(error.code === "weak_password" ? "clave" : "error");
+  if (error)
+    throw new ErrorFlujo(error.code === "weak_password" ? "clave" : "error");
 }
-
 
 /** Registro de una cuenta personal. La empresa se crea tras confirmar el correo. */
 export async function registrar(nombre: string, email: string, clave: string) {
-  if (nombre.trim().length < 2 || nombre.trim().length > 80) throw new ErrorFlujo("nombre");
+  if (nombre.trim().length < 2 || nombre.trim().length > 80)
+    throw new ErrorFlujo("nombre");
   if (clave.length < 8) throw new ErrorFlujo("clave");
   const { data, error } = await supabase.auth.signUp({
     email: email.trim().toLowerCase(),
     password: clave,
-    options: { data: { full_name: nombre.trim() }, emailRedirectTo: `${window.location.origin}/empresas` },
+    options: {
+      data: { full_name: nombre.trim() },
+      emailRedirectTo: `${window.location.origin}/empresas`,
+    },
   });
-  if (error) throw new ErrorFlujo(error.code === "weak_password" ? "clave" : "error");
+  if (error)
+    throw new ErrorFlujo(error.code === "weak_password" ? "clave" : "error");
   return Boolean(data.session);
 }
 
-export async function crearEmpresa(id: string, nombre: string, persona: string) {
-  await enOperacion(() => rpc("tm_create_company", { p_id: id, p_name: nombre.trim(), p_person_name: persona.trim() }));
+export async function crearEmpresa(
+  id: string,
+  nombre: string,
+  persona: string,
+) {
+  await enOperacion(() =>
+    rpc("tm_create_company", {
+      p_id: id,
+      p_name: nombre.trim(),
+      p_person_name: persona.trim(),
+    }),
+  );
   await aplicarSesion(sesionActual, id);
   if (state.empresa?.id !== id || !state.perfil) throw new ErrorFlujo("error");
+}
+
+export const guardarPlantilla = (nombre: string, datos: DatosTarea) =>
+  cambiar(
+    () =>
+      rpc<string>("tm_save_template", {
+        p_id: null,
+        p_data: {
+          name: nombre,
+          title: datos.titulo,
+          description: datos.descripcion,
+          priority: datos.prioridad,
+          weight: datos.peso ?? 1,
+        },
+      }),
+    (b) => {
+      if (state.perfil?.rol !== "admin") throw new ErrorFlujo("permiso");
+      const id = crypto.randomUUID();
+      b.plantillas = [
+        ...(b.plantillas ?? []),
+        {
+          id,
+          nombre,
+          titulo: datos.titulo,
+          descripcion: datos.descripcion,
+          prioridad: datos.prioridad,
+          peso: datos.peso ?? 1,
+        },
+      ];
+      return id;
+    },
+  );
+
+export const quitarPlantilla = (id: string) =>
+  cambiar(
+    () => rpc("tm_save_template", { p_id: id, p_data: {} }),
+    (b) => {
+      if (state.perfil?.rol !== "admin") throw new ErrorFlujo("permiso");
+      b.plantillas = (b.plantillas ?? []).filter((p) => p.id !== id);
+    },
+  );
+
+export const marcarNotificaciones = () =>
+  cambiar(
+    () => rpc("tm_mark_seen", {}),
+    (b) => {
+      b.vistos = { ...b.vistos, [b.yo]: new Date().toISOString() };
+    },
+  );
+
+export async function buscarTareas(
+  filtro: Record<string, unknown>,
+  pagina: number,
+  cantidad = 30,
+) {
+  const esperada = revision;
+  const data = await rpc<{ rows: FilaTarea[]; total: number }>(
+    "tm_search_tasks",
+    { p_filter: filtro, p_offset: (pagina - 1) * cantidad, p_limit: cantidad },
+  );
+  comprobarRevision(esperada);
+  return { tareas: data.rows.map(aTarea), total: data.total };
+}
+
+export async function actualizarEmpresa(
+  nombre: string,
+  contacto: string,
+  telefono: string,
+  foto?: File,
+) {
+  if (state.perfil?.rol !== "admin" || !state.empresa)
+    throw new ErrorFlujo("permiso");
+  if (
+    nombre.trim().length < 2 ||
+    nombre.trim().length > 80 ||
+    contacto.length > 200 ||
+    telefono.length > 50
+  )
+    throw new ErrorFlujo("nombre");
+  const esperada = revision;
+  let logo = state.empresa.logo ?? null;
+  let logoUrl = state.empresa.logoUrl;
+  await enOperacion(async () => {
+    if (foto) {
+      if (!foto.type.startsWith("image/")) throw new ErrorFlujo("archivo_tipo");
+      const { blob } = await preparar(foto, 300);
+      comprobarRevision(esperada);
+      if (state.demo) logoUrl = await comoDataUrl(blob);
+      else {
+        logo = `${state.empresa!.id}/logo.jpg`;
+        const { error } = await supabase.storage
+          .from("empresas")
+          .upload(logo, blob, { contentType: "image/jpeg", upsert: true });
+        if (error) throw new ErrorFlujo("archivo");
+      }
+    }
+    comprobarRevision(esperada);
+    if (state.demo && base) {
+      const copia = structuredClone(base);
+      copia.empresa = { nombre, contacto, telefono, logoUrl };
+      ponerDemo(copia);
+    } else {
+      await rpc("tm_update_company", {
+        p_name: nombre,
+        p_contact: contacto,
+        p_phone: telefono,
+        p_logo: logo,
+      });
+      await recargar();
+    }
+  });
+}
+
+export const informarOperacion = (operacion: string | null) =>
+  set({ operacion });
+
+export async function datosRespaldo() {
+  if (state.perfil?.rol !== "admin") throw new ErrorFlujo("permiso");
+  if (!state.demo || !base)
+    return rpc<Record<string, unknown>>("tm_export_company", {});
+  const company_id = "demo";
+  return {
+    version: 1,
+    owner_profile_id: state.perfil.id,
+    company: {
+      id: company_id,
+      name: state.empresa?.nombre ?? "Constructora Demo",
+      contact: state.empresa?.contacto ?? "",
+      phone: state.empresa?.telefono ?? "",
+      logo_path: null,
+    },
+    profiles: base.perfiles.map((p) => ({
+      id: p.id,
+      company_id,
+      name: p.nombre,
+      email: p.email,
+      role: p.rol,
+      active: p.activo,
+    })),
+    projects: base.obras.map((o) => ({
+      id: o.id,
+      company_id,
+      name: o.nombre,
+      detail: o.detalle,
+      active: o.activa,
+    })),
+    tasks: base.tareas.map((t) => ({
+      id: t.id,
+      company_id,
+      number: t.numero,
+      title: t.titulo,
+      description: t.descripcion,
+      priority: t.prioridad,
+      due_date: t.vence,
+      assignee_id: t.asignadaA,
+      project_id: t.obraId,
+      status: t.estado,
+      created_by: "admin",
+      created_at: t.creada,
+      updated_at: t.actualizada,
+      completed_at: t.completada,
+      archived_at: t.archivada,
+      weight: t.peso ?? 1,
+    })),
+    events: base.eventos.map((e) => ({
+      company_id,
+      task_id: e.tareaId,
+      actor_id: e.actorId,
+      actor_name: e.actor,
+      actor_role: e.rol,
+      action: e.suceso,
+      from_status: e.de,
+      to_status: e.a,
+      note: e.nota,
+      created_at: e.fecha,
+    })),
+    files: base.archivos.map((a) => ({
+      id: a.id,
+      company_id,
+      task_id: a.tareaId,
+      path: `${a.tareaId}/${a.id}.${a.tipo === "application/pdf" ? "pdf" : "jpg"}`,
+      name: a.nombre,
+      mime: a.tipo,
+      size: a.peso,
+      uploaded_by: a.subidoPor,
+      uploader_name: a.autor,
+      created_at: a.fecha,
+      url: a.url,
+    })),
+    clients: base.clientes.map((c) => ({
+      company_id,
+      project_id: c.obraId,
+      profile_id: c.perfilId,
+    })),
+    templates: (base.plantillas ?? []).map((p) => ({
+      company_id,
+      name: p.nombre,
+      title: p.titulo,
+      description: p.descripcion,
+      priority: p.prioridad,
+      weight: p.peso,
+    })),
+  };
 }

@@ -2,10 +2,17 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { VistasTareas } from "@/components/VistasTareas";
 import { TareaForm } from "@/components/TareaForm";
 import { Encabezado, ListaTareas } from "@/components/ui";
 import { useHoy } from "@/lib/fechas";
-import { ESTADOS, PRIORIDADES, abierta, codigoTarea, vencida } from "@/lib/flujo";
+import {
+  ESTADOS,
+  PRIORIDADES,
+  abierta,
+  codigoTarea,
+  vencida,
+} from "@/lib/flujo";
 import { useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
 import type { Estado, Tarea } from "@/lib/types";
@@ -13,10 +20,7 @@ import type { Estado, Tarea } from "@/lib/types";
 type Vista = "abiertas" | "completadas" | "todas";
 
 const sinTildes = (texto: string) =>
-  texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+  texto.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 
 const SIN_OBRA = "ninguna";
 
@@ -25,11 +29,13 @@ function Tareas({
   obraInicial,
   avisoFotos,
   nueva,
+  duplicar,
 }: {
   estadoInicial: Estado | "";
   obraInicial: string;
   avisoFotos: boolean;
   nueva: boolean;
+  duplicar?: Tarea;
 }) {
   const { perfil, tareas, archivadas, perfiles, obras } = useStore();
   const { t } = useT();
@@ -37,7 +43,9 @@ function Tareas({
   const router = useRouter();
   const admin = perfil?.rol === "admin";
 
-  const [vista, setVista] = useState<Vista>(estadoInicial === "completada" ? "completadas" : "abiertas");
+  const [vista, setVista] = useState<Vista>(
+    estadoInicial === "completada" ? "completadas" : "abiertas",
+  );
   const [estado, setEstado] = useState<Estado | "">(estadoInicial);
   const [obra, setObra] = useState(obraInicial);
   const [responsable, setResponsable] = useState("");
@@ -48,13 +56,29 @@ function Tareas({
 
   const texto = sinTildes(busqueda.trim());
   const lista = tareas
-    .filter((x) => (vista === "todas" ? true : vista === "abiertas" ? abierta(x) : !abierta(x)))
+    .filter((x) =>
+      vista === "todas"
+        ? true
+        : vista === "abiertas"
+          ? abierta(x)
+          : !abierta(x),
+    )
     .filter((x) => !estado || x.estado === estado)
     .filter((x) => !obra || (obra === SIN_OBRA ? !x.obraId : x.obraId === obra))
-    .filter((x) => !responsable || (responsable === "nadie" ? !x.asignadaA : x.asignadaA === responsable))
+    .filter(
+      (x) =>
+        !responsable ||
+        (responsable === "nadie" ? !x.asignadaA : x.asignadaA === responsable),
+    )
     .filter((x) => !prioridad || x.prioridad === prioridad)
     .filter((x) => !soloVencidas || vencida(x, hoy))
-    .filter((x) => !texto || sinTildes(`${codigoTarea(x.numero)} ${x.titulo}`).includes(texto))
+    .filter(
+      (x) =>
+        !texto ||
+        sinTildes(
+          `${codigoTarea(x.numero)} ${x.titulo} ${x.descripcion}`,
+        ).includes(texto),
+    )
     // Primero lo que vence antes; lo completado, de lo más reciente a lo más viejo.
     .sort((a: Tarea, b: Tarea) =>
       vista === "completadas"
@@ -64,28 +88,31 @@ function Tareas({
 
   // Los estados que tiene sentido ofrecer en cada vista.
   const estados = ESTADOS.filter((e) =>
-    vista === "todas" ? true : vista === "abiertas" ? e !== "completada" : e === "completada",
+    vista === "todas"
+      ? true
+      : vista === "abiertas"
+        ? e !== "completada"
+        : e === "completada",
   );
   // Las archivadas solo las ve el administrador.
   const archivadasVista = admin
     ? archivadas
-        .filter((x) => !obra || (obra === SIN_OBRA ? !x.obraId : x.obraId === obra))
-        .sort((a: Tarea, b: Tarea) => (b.archivada ?? "").localeCompare(a.archivada ?? ""))
+        .filter(
+          (x) => !obra || (obra === SIN_OBRA ? !x.obraId : x.obraId === obra),
+        )
+        .sort((a: Tarea, b: Tarea) =>
+          (b.archivada ?? "").localeCompare(a.archivada ?? ""),
+        )
     : [];
 
   const conTareas = new Set(tareas.map((x) => x.obraId));
   const opciones = [
     { id: "", nombre: t.obras.todas },
-    ...obras.filter((o) => o.activa || conTareas.has(o.id) || o.id === obra).map((o) => ({ id: o.id, nombre: o.nombre })),
+    ...obras
+      .filter((o) => o.activa || conTareas.has(o.id) || o.id === obra)
+      .map((o) => ({ id: o.id, nombre: o.nombre })),
     ...(conTareas.has(null) ? [{ id: SIN_OBRA, nombre: t.comun.sinObra }] : []),
   ];
-
-  const grupos = obra
-    ? []
-    : opciones
-        .slice(1)
-        .map((o) => ({ ...o, tareas: lista.filter((x) => (o.id === SIN_OBRA ? !x.obraId : x.obraId === o.id)) }))
-        .filter((g) => g.tareas.length > 0);
 
   const cambiarVista = (nueva: Vista) => {
     setVista(nueva);
@@ -95,9 +122,15 @@ function Tareas({
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <Encabezado rotulo={t.tareas.cuenta(lista.length)} titulo={t.tareas.titulo}>
+      <Encabezado
+        rotulo={t.tareas.cuenta(lista.length)}
+        titulo={t.tareas.titulo}
+      >
         {admin && !creando && (
-          <button className="btn btn-marca hidden sm:inline-flex" onClick={() => setCreando(true)}>
+          <button
+            className="btn btn-marca hidden sm:inline-flex"
+            onClick={() => setCreando(true)}
+          >
             + {t.tareas.nueva}
           </button>
         )}
@@ -110,7 +143,13 @@ function Tareas({
           aria-label={t.tareas.nueva}
           className="fixed bottom-20 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl transition-transform active:scale-95 sm:hidden"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            className="h-6 w-6"
+          >
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
@@ -118,7 +157,10 @@ function Tareas({
       )}
 
       {avisoFotos && (
-        <div role="status" className="hoja border-amber-200 bg-amber-50/80 p-4 text-sm font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+        <div
+          role="status"
+          className="hoja border-amber-200 bg-amber-50/80 p-4 text-sm font-medium text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+        >
           {t.tareas.avisoFotos}
         </div>
       )}
@@ -126,9 +168,27 @@ function Tareas({
       {creando && (
         <div className="rounded-2xl border border-regla bg-hoja p-5 shadow-sm sm:p-7">
           <TareaForm
+            datosIniciales={
+              duplicar
+                ? {
+                    titulo: `${duplicar.titulo.slice(0, 132)} (copia)`,
+                    descripcion: duplicar.descripcion,
+                    prioridad: duplicar.prioridad,
+                    vence: null,
+                    asignadaA: duplicar.asignadaA,
+                    obraId: duplicar.obraId,
+                    peso: duplicar.peso ?? 1,
+                  }
+                : undefined
+            }
+            borradorId={duplicar ? `copia-${duplicar.id}` : undefined}
             obraInicial={obra && obra !== SIN_OBRA ? obra : null}
             onCancel={() => setCreando(false)}
-            onDone={(id, sinArchivos) => router.push(`/panel/tareas/${id}${sinArchivos ? "?aviso=archivo" : ""}`)}
+            onDone={(id, sinArchivos) =>
+              router.push(
+                `/panel/tareas/${id}${sinArchivos ? "?aviso=archivo" : ""}`,
+              )
+            }
           />
         </div>
       )}
@@ -175,7 +235,13 @@ function Tareas({
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
           <div className="relative col-span-2 lg:col-span-1">
             <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-4 w-4"
+              >
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
@@ -257,39 +323,34 @@ function Tareas({
         </div>
       </div>
 
-      {/* Resultados de tareas */}
-      {lista.length === 0 ? (
-        <div className="hoja p-12 text-center text-sm text-gris">{t.tareas.vacio}</div>
-      ) : grupos.length > 1 ? (
-        <div className="space-y-8">
-          {grupos.map((g, i) => (
-            <section key={g.id} className="space-y-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <button
-                  className="text-left font-display text-lg font-bold tracking-tight text-tinta hover:text-blue-600 dark:hover:text-blue-400"
-                  onClick={() => setObra(g.id)}
-                >
-                  {g.nombre}
-                </button>
-                <span className="text-xs font-semibold text-gris">{t.tareas.cuenta(g.tareas.length)}</span>
-              </div>
-              <ListaTareas tareas={g.tareas} conResponsable={admin} cabecera={i === 0} />
-            </section>
-          ))}
-        </div>
-      ) : (
-        <ListaTareas tareas={lista} conResponsable={admin} conObra={!obra} />
-      )}
+      <VistasTareas
+        filtro={{
+          q: busqueda,
+          view: vista,
+          status: estado,
+          project: obra,
+          assignee: responsable,
+          priority: prioridad,
+          overdue: soloVencidas,
+        }}
+        local={lista}
+      />
 
       {/* Tareas Archivadas */}
       {archivadasVista.length > 0 && (
         <section className="mt-12 space-y-3 border-t border-regla pt-8">
           <div className="flex items-baseline justify-between gap-3 font-display text-lg font-bold tracking-tight text-tinta">
             <span>{t.tareas.archivadas}</span>
-            <span className="text-xs font-normal text-gris">{t.tareas.cuenta(archivadasVista.length)}</span>
+            <span className="text-xs font-normal text-gris">
+              {t.tareas.cuenta(archivadasVista.length)}
+            </span>
           </div>
           <p className="text-xs text-gris">{t.tareas.archivadasAyuda}</p>
-          <ListaTareas tareas={archivadasVista} conResponsable conObra={!obra} />
+          <ListaTareas
+            tareas={archivadasVista}
+            conResponsable
+            conObra={!obra}
+          />
         </section>
       )}
     </div>
@@ -298,12 +359,26 @@ function Tareas({
 
 export default function TareasPage() {
   const params = useSearchParams();
-  const { perfil } = useStore();
+  const { perfil, tareas, archivadas } = useStore();
   const estado = params.get("estado") ?? "";
   const obra = params.get("obra") ?? "";
   const avisoFotos = params.get("aviso") === "fotos";
-  const valido = (ESTADOS as string[]).includes(estado) ? (estado as Estado) : "";
-  const nueva = params.get("nueva") === "1";
+  const valido = (ESTADOS as string[]).includes(estado)
+    ? (estado as Estado)
+    : "";
+  const duplicar = [...tareas, ...archivadas].find(
+    (t) => t.id === params.get("duplicar"),
+  );
+  const nueva = params.get("nueva") === "1" || Boolean(duplicar);
   if (!perfil) return null;
-  return <Tareas key={`${valido}-${obra}-${nueva}`} estadoInicial={valido} obraInicial={obra} avisoFotos={avisoFotos} nueva={nueva} />;
+  return (
+    <Tareas
+      key={`${valido}-${obra}-${nueva}-${duplicar?.id}`}
+      duplicar={duplicar}
+      estadoInicial={valido}
+      obraInicial={obra}
+      avisoFotos={avisoFotos}
+      nueva={nueva}
+    />
+  );
 }

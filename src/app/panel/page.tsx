@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import { avanceDe } from "@/lib/avance";
+
 import Link from "next/link";
 import { Avance, Barras, Renglones, Seccion } from "@/components/ui";
 import { ObraVisual } from "@/components/Arquitectura";
@@ -110,23 +112,21 @@ function Obras({
     <ul className="dashboard-obras">
       {obras.map((o) => {
         const suyas = tareas.filter((x) => x.obraId === o.id);
-        const hechas = suyas.filter((x) => x.estado === "completada").length;
         const abiertas = suyas.filter(abierta).length;
         const vencidas = suyas.filter((x) => vencida(x, hoy)).length;
-        const porcentaje = suyas.length
-          ? Math.round((hechas / suyas.length) * 100)
-          : 0;
+        const avance = avanceDe(suyas);
+        const porcentaje = avance.porcentaje;
         return (
           <li key={o.id}>
             <Link
-              href={`/panel/tareas?obra=${o.id}`}
+              href={`/panel/obras/${o.id}`}
               className="dashboard-obra"
             >
               <ObraVisual />
               <div className="dashboard-obra-info">
                 <h3>{o.nombre}</h3>
                 <div className="dashboard-obra-progreso">
-                  <Avance hechas={hechas} total={suyas.length} />
+                  <Avance hechas={avance.hechas} total={avance.total} />
                   <strong>{porcentaje}%</strong>
                 </div>
                 <p>
@@ -256,10 +256,7 @@ export default function InicioPage() {
   const enEspera = abiertas.filter((x) => ESPERA_ADMIN.includes(x.estado));
   const avances = activas.map((o) => {
     const suyas = tareas.filter((x) => x.obraId === o.id);
-    return suyas.length
-      ? (suyas.filter((x) => x.estado === "completada").length / suyas.length) *
-          100
-      : 0;
+    return avanceDe(suyas).porcentaje;
   });
   const promedio = avances.length
     ? `${Math.round(avances.reduce((s, n) => s + n, 0) / avances.length)}%`
