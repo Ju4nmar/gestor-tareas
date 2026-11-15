@@ -218,8 +218,12 @@ export function Visor({
   const visor = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialogo = visor.current;
+    const anterior = document.activeElement as HTMLElement | null;
     dialogo?.showModal();
-    return () => dialogo?.close();
+    return () => {
+      dialogo?.close();
+      anterior?.focus();
+    };
   }, []);
   return (
     <dialog
@@ -235,7 +239,6 @@ export function Visor({
         <p className="truncate text-sm">{pie}</p>
         <button
           type="button"
-          autoFocus
           onClick={onCerrar}
           className="btn shrink-0 border-white bg-white text-black"
         >
