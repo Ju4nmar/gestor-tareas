@@ -1598,3 +1598,25 @@ button:disabled {
     opacity: 1;
   }
 }
+
+@media print {
+  @page { margin: 15mm; }
+  body:has(.informe-obra) { background: white; color: #111827; }
+  body:has(.informe-obra) *:has(.informe-obra) {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  body:has(.informe-obra) *:not(:has(.informe-obra)):not(.informe-obra):not(.informe-obra *) { display: none !important; }
+  .informe-obra { position: static; width: 100%; margin: 0; padding: 0; border: 0; box-shadow: none; background: white; color: #111827; }
+  .informe-obra tr, .informe-obra figure { break-inside: avoid; }
+}
+
+.trazo-avisos { position: fixed; left: 1rem; right: 1rem; bottom: calc(5rem + env(safe-area-inset-bottom)); max-height: 70vh; }
+@media (min-width: 768px) { .trazo-avisos { position: absolute; left: auto; right: 0; top: calc(100% + .5rem); bottom: auto; width: 25rem; max-width: 90vw; } }

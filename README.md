@@ -144,3 +144,37 @@ Vercel ejecuta tambien `npm test && npm run lint && npm run build` antes de publ
 GitHub mantiene una cuota de uso incluida. El limite de gasto de la cuenta se revisa en Billing >
 Budgets and alerts. La proteccion obligatoria de main en este repositorio privado depende de un plan
 compatible de GitHub.
+
+
+### Operación, respaldos y correo de TRAZO
+
+Desde Empresa, un administrador puede descargar un respaldo comprimido de sus datos y archivos.
+La importación comprueba SHA-256 y crea una empresa nueva con identificadores nuevos. Los otros
+miembros reciben invitaciones nuevas. Si una transferencia falla, volver a abrir el mismo archivo
+reanuda la recuperación. Se conservan las empresas originales. El límite es de 250 MB descomprimidos,
+10.000 tareas, 10.000 archivos, 2.000 perfiles y 30 MB de metadatos.
+
+Guardar las copias en una ubicación privada externa y comprobar periódicamente su recuperación.
+Para recuperación del proyecto completo se necesita también una copia de Postgres con Auth y los
+objetos de Storage, preparada con las herramientas oficiales de Supabase y las credenciales de base
+de datos del propietario. Las contraseñas y credenciales se guardan fuera del repositorio.
+
+El propietario creará una cuenta exclusiva de TRAZO para el correo. Configurar en el panel de
+Supabase Authentication > Emails > SMTP el servidor, puerto, remitente y credenciales del proveedor
+elegido. Comprobar confirmación, recuperación y aceptación de invitaciones con una cuenta externa.
+Mantener Site URL en https://gestor-tareas-woad.vercel.app y las redirecciones autorizadas del proyecto.
+
+Los borradores guardan textos en el navegador de la cuenta y empresa correspondiente. Cerrar sesión
+los elimina del dispositivo. Las selecciones de archivos deben repetirse después de recargar.
+Las notificaciones son internas. El informe de cliente usa Imprimir o guardar PDF del navegador.
+
+Las comprobaciones adicionales de base de datos están en `supabase/tests/operaciones.sql` y finalizan
+con ROLLBACK. Incluyen recuperación, permisos, reintentos y búsqueda paginada por encima de 1.000 tareas.
+
+
+La tabla privada `tm_restore_jobs` usa RLS con acceso directo revocado. Solo las funciones de
+recuperación acceden a sus registros, con comprobación de cuenta creadora y empresa.
+[Referencia de la comprobación RLS](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+
+La protección de contraseñas filtradas sigue pendiente según las funciones disponibles del plan.
+[Referencia de seguridad de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).

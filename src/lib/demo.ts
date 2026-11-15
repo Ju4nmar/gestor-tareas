@@ -10,6 +10,8 @@ import type {
   Obra,
   ObraCliente,
   Perfil,
+  Plantilla,
+  Empresa,
   Rol,
   Suceso,
   Tarea,
@@ -20,6 +22,9 @@ import type {
 // (supabase/schema.sql), con las mismas reglas de flujo.ts, sobre un objeto en memoria.
 
 export type Base = {
+  plantillas?: Plantilla[];
+  vistos?: Record<string, string>;
+  empresa?: Partial<Empresa>;
   /** Perfil con el que se está viendo la muestra. */
   yo: string;
   perfiles: Perfil[];
@@ -72,6 +77,8 @@ function anotar(
 export function guardarTarea(b: Base, datos: DatosTarea, id: string | null, fecha = ahoraIso()) {
   const admin = administrador(b);
   const titulo = datos.titulo.trim();
+  const peso = datos.peso ?? 1;
+  if (!Number.isInteger(peso) || peso < 1 || peso > 1000) throw new ErrorFlujo("error");
   if (titulo.length < 3 || titulo.length > 140) throw new ErrorFlujo("titulo");
   if (datos.descripcion.length > 5000) throw new ErrorFlujo("descripcion");
   // Un cliente nunca es responsable de una tarea.
@@ -280,6 +287,7 @@ export function vistaCliente(b: Base): ObraCliente[] {
           etapa: etapaDe(t.estado),
           vence: t.vence,
           completada: t.completada,
+          peso: t.peso ?? 1,
         })),
         archivos: b.archivos
           .filter((a) => ids.has(a.tareaId))

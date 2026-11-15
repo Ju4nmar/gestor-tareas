@@ -1,5 +1,7 @@
 "use client";
 
+import { avanceDe } from "@/lib/avance";
+
 import { useState } from "react";
 import { fechaLocal, useHoy } from "@/lib/fechas";
 import { ETAPAS } from "@/lib/flujo";
@@ -35,6 +37,7 @@ export function VistaCliente() {
   const tareas = obra?.tareas ?? [];
   const de = (etapa: Etapa) => tareas.filter((x) => x.etapa === etapa);
   const hechas = de("terminada").length;
+  const avance = avanceDe(tareas);
   const titulo = new Map(tareas.map((x) => [x.id, x.titulo]));
   const grande = archivos.find((a) => a.id === abierta);
 
@@ -94,7 +97,7 @@ export function VistaCliente() {
             <div className="mt-8 flex items-baseline justify-between gap-4">
               <div>
                 <span className="font-display text-5xl font-extrabold leading-none tracking-tight text-tinta sm:text-6xl">
-                  {tareas.length ? Math.round((hechas / tareas.length) * 100) : 0}
+                  {avance.porcentaje}
                   <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">%</span>
                 </span>
                 <span className="block text-xs font-medium text-gris mt-1">Avance total completado</span>
@@ -104,7 +107,7 @@ export function VistaCliente() {
               </span>
             </div>
             <div className="mt-4">
-              <Avance hechas={hechas} total={tareas.length} />
+              <Avance hechas={avance.hechas} total={avance.total} />
             </div>
 
             <dl className="mt-8 grid grid-cols-3 gap-3 border-t border-regla pt-6">

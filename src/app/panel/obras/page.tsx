@@ -1,5 +1,7 @@
 "use client";
 
+import { avanceDe } from "@/lib/avance";
+
 import Link from "next/link";
 import { ObraVisual } from "@/components/Arquitectura";
 import { useState } from "react";
@@ -265,6 +267,7 @@ function Tarjeta({ obra, tareas, admin, clientes }: { obra: Obra; tareas: Tarea[
   const [error, setError] = useState("");
 
   const hechas = tareas.filter((x) => x.estado === "completada").length;
+  const avance = avanceDe(tareas);
   const abiertas = tareas.filter(abierta).length;
   const vencidas = tareas.filter((x) => vencida(x, hoy)).length;
 
@@ -304,10 +307,10 @@ function Tarjeta({ obra, tareas, admin, clientes }: { obra: Obra; tareas: Tarea[
       <div className="mt-5">
         <div className="flex items-center justify-between text-xs font-semibold text-gris">
           <span>{tareas.length ? t.obras.avance(hechas, tareas.length) : t.obras.sinTareas}</span>
-          <span>{tareas.length ? `${Math.round((hechas / tareas.length) * 100)}%` : "0%"}</span>
+          <span>{`${avance.porcentaje}%`}</span>
         </div>
         <div className="mt-2">
-          <Avance hechas={hechas} total={tareas.length} />
+          <Avance hechas={avance.hechas} total={avance.total} />
         </div>
         {abiertas > 0 && (
           <p className="mt-2 flex items-center gap-2 text-xs text-gris">
@@ -324,8 +327,8 @@ function Tarjeta({ obra, tareas, admin, clientes }: { obra: Obra; tareas: Tarea[
       {admin && <Clientes obra={obra} clientes={clientes} />}
 
       <div className="mt-auto pt-6">
-        <Link href={`/panel/tareas?obra=${obra.id}`} className="btn btn-linea w-full justify-center text-xs font-semibold">
-          {t.obras.verTareas} →
+        <Link href={`/panel/obras/${obra.id}`} className="btn btn-linea w-full justify-center text-xs font-semibold">
+          Ver obra →
         </Link>
         {admin && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gris">

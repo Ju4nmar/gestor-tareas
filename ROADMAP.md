@@ -1,58 +1,41 @@
-# Hoja de ruta
+# Hoja de ruta de TRAZO
 
-Documento compartido entre las herramientas que trabajan en este repositorio (Claude, Codex).
-Se lee al empezar y se actualiza al terminar cada tarea.
+## Entregado
 
-## Cómo trabajamos
+- Rediseño TRAZO, acceso adaptable, temas y navegación móvil.
+- Next.js 16.4.6, registro, recuperación de contraseña e invitaciones con caducidad.
+- Supabase dedicado, empresas independientes, permisos por membresía y archivos privados.
+- Flujo de tareas, historial, archivo y eliminación con limpieza de archivos.
+- Borradores de tareas, comentarios y notas de acciones guardados por cuenta y empresa en el dispositivo.
+- Reintentos de creación y archivos con protección frente a duplicados, progreso por archivo.
+- Notificaciones de actividad dentro de la app y marca de lectura por persona y empresa.
+- Ficha de obra con tareas, personas, archivos y avance ponderado.
+- Plantillas reutilizables de tareas y duplicación.
+- Informe de obra para cliente con fotografías, impresión y guardado como PDF.
+- Datos de empresa, contacto y logo privado.
+- Lista paginada con búsqueda en servidor, tablero y calendario de vencimientos.
+- Respaldo comprimido de empresa con archivos, integridad SHA-256 y recuperación en una empresa nueva.
+- Vistas previas de Vercel con datos ficticios y conexión de Supabase bloqueada.
+- Verificaciones en GitHub y antes de cada publicación en Vercel.
 
-- **Una rama por tarea** (`fix/...`, `feat/...`, `test/...`), partiendo de `main` actualizado.
-- **Solo una herramienta edita una rama a la vez.** La otra revisa el diff (`git diff main...<rama>`).
-- Antes de unir una rama: `npx tsc --noEmit`, `npm run lint` y `npm run build` sin errores.
-- Los cambios de base de datos van como migración numerada en `supabase/migrations/` **y** al final de
-  `supabase/schema.sql` (nueva PARTE), con el mismo contenido. Se prueban primero en el Supabase de pruebas.
-- Los textos van siempre en español e inglés (`src/lib/textos.ts`).
+## Verificación
 
-## Estado
+Ejecutar `npm test`, `npx next typegen`, `npx tsc --noEmit`, `npm run lint` y `npm run build`.
+Las pruebas SQL `supabase/tests/empresas.sql` y `supabase/tests/operaciones.sql` usan datos temporales y terminan con ROLLBACK.
+Cubren aislamiento, roles, invitaciones, archivos, pesos, plantillas, creación repetida, búsqueda de más de 1.000 tareas y recuperación.
+Los cambios SQL se incluyen en migraciones y se agregan al final de `supabase/schema.sql`.
 
-| # | Tarea | Rama | Estado |
-|---|-------|------|--------|
-| 1 | Archivar tareas en vez de borrarlas (+ limpieza de fotos al borrar) | `fix/archivar-tareas` | Hecha |
-| 2 | Invitaciones que caducan | `fix/invitaciones-caducan` | Hecha |
-| 3 | Pruebas de las transiciones del flujo (TypeScript y SQL) | `test/transiciones-flujo` | Hecha |
+## Pendientes del propietario
 
-### Tarea 1 · Archivar tareas
+- Crear una cuenta de correo exclusiva de TRAZO, elegir el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.
+- Revisar el límite de gasto de GitHub en Billing > Budgets and alerts. La API disponible no permite confirmar esta configuración de la cuenta personal.
+- Guardar periódicamente las copias de empresa en una ubicación privada externa. Ensayar la recuperación con una copia reciente que incluya archivos.
+- Preparar además un respaldo completo de Postgres/Auth y Storage para recuperación ante pérdida del proyecto. Las copias de empresa recuperan datos operativos y generan nuevas invitaciones.
+- La protección obligatoria de main en este repositorio privado requiere un plan compatible de GitHub.
 
-Hecho: migración `003_archivar_tareas.sql` (columna `archived_at`, funciones `tm_archive_task` y
-`tm_delete_task` que solo borra archivadas, políticas y vistas que ocultan las archivadas al equipo y al
-cliente, disparadores que congelan la tarea archivada), cambios en `store.ts`, `demo.ts`, textos y pantallas.
+## Límites actuales
 
-Por verificar a mano en el Supabase de pruebas (ver pasos en la conversación): archivar, restaurar,
-borrar definitivamente con fotos, y que un empleado y un cliente no vean las archivadas.
-
-### Tarea 2 · Invitaciones que caducan
-
-Hecho: migración `004_invitaciones_caducan.sql` (columna `invite_expires_at`, funciones `tm_invite_info`,
-`tm_activate`, `tm_invite`, `tm_invite_client`, `tm_renew_invite`), vigencia en `store.ts`, `demo.ts`,
-componentes `VigenciaInvitacion` y `AccionesInvitacion`, pantallas de equipo y obras, y pantalla `/activar`.
-Probado con prueba E2E de navegador.
-
-### Tarea 3 · Pruebas de las transiciones del flujo (TypeScript y SQL)
-
-Hecho: suite de pruebas automatizadas en `test/flujo-transiciones.test.ts` con runner `test/run.mjs`
-y comando `npm test`. Cubre las 450 combinaciones de transiciones de estado, permisos por rol,
-validación de notas, tareas archivadas y paridad estricta entre `flujo.ts` y la función SQL `tm_act`.
-
-## Después de estas tres
-
-Decididas tras el piloto con el primer cliente (obra real, 2 a 3 semanas). Candidatas, sin orden:
-notificaciones, plantillas de obra, informe semanal al cliente con fotos, vista tablero, personalización
-por cliente (logo, color, nombre), paginación, cabecera CSP (primero en modo solo reporte), multiempresa.
-
-## TRAZO multiempresa
-
-Rama `feature/trazo-multiempresa`, basada en `feature/trazo-redesign`.
-Proyecto dedicado `dcwmzdsefflgodwyhadp` instalado desde cero. Registro, creación y selección de
-empresa, roles por membresía, invitaciones para cuentas existentes y aislamiento RLS implementados.
-Pruebas SQL transaccionales en `supabase/tests/empresas.sql`.
-Pendientes operativos del propietario, configurar URLs de Auth y correo SMTP, verificar la
-confirmación de su cuenta real y autorizar la publicación cuando corresponda.
+- Los archivos seleccionados permanecen en la pestaña hasta subirlos. Tras recargar, deben volver a seleccionarse.
+- La recuperación de empresa admite 250 MB descomprimidos, 10.000 tareas, 10.000 archivos y 2.000 perfiles, con hasta 30 MB de metadatos.
+- El tablero y el calendario respetan los filtros y la página de resultados seleccionada.
+- El PDF se guarda mediante el diálogo de impresión del navegador.

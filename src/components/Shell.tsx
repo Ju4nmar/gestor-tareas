@@ -7,6 +7,7 @@ import { ESPERA_ADMIN, abierta } from "@/lib/flujo";
 import { SOLO_DEMO } from "@/lib/entorno";
 import { personasDemo, recargar, salir, salirDemo, useStore, verComo } from "@/lib/store";
 import { useT } from "@/lib/textos";
+import { Notificaciones } from "./Notificaciones";
 import { VistaCliente } from "./Cliente";
 import { Ajustes, Cargando, Logo } from "./ui";
 
@@ -142,7 +143,7 @@ function Avatar({ nombre }: { nombre: string }) {
 
 /** Marco de la aplicación: comprueba el acceso y pinta el menú según el rol. */
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { listo, perfil, demo, cargado, error, tareas, email, empresa } = useStore();
+  const { listo, perfil, demo, cargado, error, tareas, email, empresa, operacion } = useStore();
   const { t } = useT();
   const router = useRouter();
   const pathname = usePathname();
@@ -202,6 +203,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ? [
           { href: "/panel/informes", icono: "informes", label: t.nav.informes, cuenta: 0, resaltar: false },
           { href: "/panel/equipo", icono: "equipo", label: t.nav.equipo, cuenta: 0, resaltar: false },
+          { href: "/panel/empresa", icono: "obras", label: "Empresa", cuenta: 0, resaltar: false },
         ]
       : []),
   ];
@@ -232,20 +234,21 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen flex-1 flex-col bg-papel">
         {demo && <BarraDemo />}
         <header className="sticky top-0 z-20 border-b border-regla bg-hoja/90 backdrop-blur-md">
-          <div className="mx-auto flex max-w-4xl items-center justify-between px-5 py-3.5">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-3.5">
             <div>
               <Logo />
-              {empresa && (
+              {empresa && !demo && (
                 <Link href="/empresas" className="enlace mt-2 block text-xs">
                   {empresa.nombre} · Cambiar empresa
                 </Link>
               )}
             </div>
-            <Ajustes />
+            <div className="flex flex-wrap gap-2"><Notificaciones /><Ajustes /></div>
           </div>
         </header>
         <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-16 pt-8 sm:pt-10">
           <div className="animate-entrar">
+            {operacion && <p className="mensaje-info mb-4" role="status">{operacion}</p>}
             {aviso}
             <VistaCliente />
           </div>
@@ -281,13 +284,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Ajustes className="lg:hidden" />
           </div>
 
-          {empresa && (
+          {empresa && !demo && (
             <Link href="/empresas" className="mx-5 mb-2 block break-words rounded-lg border border-white/15 px-3 py-2 text-xs text-white hover:bg-white/10">
               {empresa.nombre}
               <span className="mt-1 block text-cyan-300">Cambiar empresa</span>
             </Link>
           )}
 
+          <div className="px-5 pb-3 lg:hidden"><Notificaciones /></div>
           {/* Menú de navegación Desktop */}
           <nav aria-label="Navegación principal" className="sidebar-nav mt-4 hidden flex-1 flex-col gap-1 px-3 lg:flex">
             {secciones.map((s) => {
@@ -358,7 +362,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {/* Contenido principal */}
         <main id="contenido" className="trazo-main min-w-0 flex-1 px-4 pb-24 pt-6 sm:px-6 sm:pb-28 sm:pt-8 lg:px-10 lg:py-8">
           <div className="mx-auto max-w-[1440px] animate-entrar" key={pathname}>
-            <div className="panel-toolbar"><span>{secciones.find((seccion) => activa(seccion.href))?.label}</span><Ajustes /></div>
+            <div className="panel-toolbar"><span>{secciones.find((seccion) => activa(seccion.href))?.label}</span><Notificaciones /><Ajustes /></div>
+            {operacion && <p className="mensaje-info mb-4" role="status">{operacion}</p>}
             {aviso}
             {children}
           </div>
