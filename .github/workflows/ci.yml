@@ -37,7 +37,9 @@ jobs:
       - name: Ejecutar pruebas
         run: npm test
       - name: Comprobar TypeScript
-        run: npx tsc --noEmit
+        run: |
+          npx next typegen
+          npx tsc --noEmit
       - name: Revisar codigo
         run: npm run lint
       - name: Compilar
