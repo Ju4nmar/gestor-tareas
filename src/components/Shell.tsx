@@ -212,6 +212,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const activa = (href: string) => (href === "/panel" ? pathname === href : pathname.startsWith(href));
   const enResto = resto.some((s) => activa(s.href));
   const cerrar = () => (demo ? salirDemo() : void salir());
+  const textoCerrar = SOLO_DEMO ? "Reiniciar demo" : demo ? t.demo.salir : t.comun.salir;
 
   const aviso = error && (
     <div className="hoja mb-6 flex flex-wrap items-center justify-between gap-3 border-rose-200 bg-rose-50/70 p-4 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
@@ -257,7 +258,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <button type="button" className="btn btn-linea py-1.5 text-xs" onClick={cerrar}>
-              {demo ? t.demo.salir : t.comun.salir}
+              {textoCerrar}
             </button>
           </div>
         </main>
@@ -344,8 +345,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={cerrar}
-                title={demo ? t.demo.salir : t.comun.salir}
-                aria-label={demo ? t.demo.salir : t.comun.salir}
+                title={textoCerrar}
+                aria-label={textoCerrar}
                 className="rounded-lg p-1.5 text-gris transition-colors hover:bg-slate-200 hover:text-tinta dark:hover:bg-slate-700"
               >
                 <Icono nombre="salir" className="h-4 w-4" />
@@ -414,7 +415,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
               <button type="button" className="btn btn-linea py-1.5 text-xs" onClick={cerrar}>
-                {demo ? t.demo.salir : t.comun.salir}
+                {textoCerrar}
               </button>
             </div>
           </div>
