@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Ajustes, Logo, falloDe } from "@/components/ui";
 import { Arquitectura } from "@/components/Arquitectura";
+import { AccesoGoogle } from "@/components/AccesoGoogle";
 import { Icon } from "@/components/Icon";
 import { entrar, entrarDemo, pedirClave, useStore } from "@/lib/store";
 import { useT } from "@/lib/textos";
@@ -212,6 +213,7 @@ export default function EntradaPage() {
                 <Icon name="flecha" />
               </button>
             </form>
+            <AccesoGoogle ocupado={enviando || !listo} />
             <Link
               href="/registro"
               className="btn btn-linea mt-4 flex w-full justify-center"

@@ -31,7 +31,7 @@ import type {
 // por una función de la base de datos; en el modo de muestra todo ocurre en la
 // pestaña (ver demo.ts). Las pantallas no distinguen entre uno y otro.
 
-export type State = {
+type State = {
   /** Ya se sabe si hay sesión o no. */
   listo: boolean;
   /** Correo de la sesión, tenga o no acceso. */
@@ -1073,6 +1073,36 @@ export async function urlsDe(archivos: Archivo[]) {
 
 // --- Cuenta -----------------------------------------------------------------
 
+export async function entrarConGoogle() {
+  if (SOLO_DEMO)
+    throw new Error("La vista previa utiliza datos de demostración.");
+  const respuesta = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings`,
+    { headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY! } },
+  );
+  if (!respuesta.ok)
+    throw new Error(
+      "No se pudo conectar con el servicio de acceso. Vuelve a intentarlo.",
+    );
+  const ajustes = await respuesta.json();
+  if (ajustes.external?.google !== true) {
+    throw new Error(
+      "El acceso con Google está pendiente de activación. Puedes usar tu correo y contraseña.",
+    );
+  }
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: new URL("/", window.location.origin).href,
+      queryParams: { prompt: "select_account" },
+    },
+  });
+  if (error)
+    throw new Error(
+      "No se pudo iniciar el acceso con Google. Vuelve a intentarlo.",
+    );
+}
+
 export async function entrar(email: string, clave: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -1097,7 +1127,7 @@ export async function salir() {
  * Nombre y correo de una invitación pendiente; `{ vencida: true }` si su código ya venció
  * (no se revela a quién era); nulo si el código no sirve.
  */
-export type InfoInvitacion =
+type InfoInvitacion =
   { name: string; email: string; company: string } | { vencida: true } | null;
 
 export async function infoInvitacion(codigo: string): Promise<InfoInvitacion> {
