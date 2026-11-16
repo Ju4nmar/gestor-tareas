@@ -25,6 +25,11 @@ Las pruebas SQL `supabase/tests/empresas.sql` y `supabase/tests/operaciones.sql`
 Cubren aislamiento, roles, invitaciones, archivos, pesos, plantillas, creación repetida, búsqueda de más de 1.000 tareas y recuperación.
 Los cambios SQL se incluyen en migraciones y se agregan al final de `supabase/schema.sql`.
 
+## Acceso con Google en preparación
+
+Rama `feature/login-google`. Botón en acceso y registro, manejo de errores y pruebas automatizadas.
+Pendiente crear el cliente web en Google Cloud, habilitar el proveedor en Supabase y probar el recorrido real.
+
 ## Pendientes del propietario
 
 - Crear una cuenta de correo exclusiva de TRAZO, elegir el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.

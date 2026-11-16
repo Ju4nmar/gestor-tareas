@@ -178,3 +178,21 @@ recuperación acceden a sus registros, con comprobación de cuenta creadora y em
 
 La protección de contraseñas filtradas sigue pendiente según las funciones disponibles del plan.
 [Referencia de seguridad de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+
+### Inicio de sesión con Google
+
+El botón Continuar con Google está disponible en acceso y registro. Supabase mantiene la sesión
+y el flujo existente selecciona la membresía o abre la creación de empresa para una cuenta nueva.
+La vista previa de demostración mantiene el acceso externo bloqueado.
+
+Configurar en Google Auth Platform un cliente de aplicación web del proyecto TRAZO, con los scopes
+openid, email y profile. Autorizar los orígenes de producción y desarrollo, y la redirección
+`https://dcwmzdsefflgodwyhadp.supabase.co/auth/v1/callback`.
+Guardar Client ID y Client Secret directamente en el proveedor Google de Supabase y habilitarlo.
+El secreto permanece en Supabase. El cliente comprueba que el proveedor esté activo antes de abrir Google.
+Mientras Google esté en Testing, añadir las cuentas de prueba en Audience. Para admitir a las empresas
+externas, completar los requisitos de Google y publicar la aplicación OAuth.
+
+Probar una cuenta nueva, una cuenta existente y la aceptación de una invitación con esa sesión.
+La activación y la prueba real quedan pendientes de las credenciales del propietario.

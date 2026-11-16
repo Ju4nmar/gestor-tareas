@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AccesoGoogle } from "@/components/AccesoGoogle";
 import { Marco } from "@/components/Marco";
 import { falloDe } from "@/components/ui";
 import { registrar } from "@/lib/store";
@@ -118,6 +119,7 @@ export default function RegistroPage() {
           </button>
         </form>
       )}
+      {!confirmar && <AccesoGoogle ocupado={enviando} />}
       <Link href="/" className="enlace mt-5 inline-block text-sm">
         Ya tengo cuenta. Iniciar sesión
       </Link>
