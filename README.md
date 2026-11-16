@@ -70,7 +70,16 @@ con ROLLBACK. Las vistas previas de Vercel utilizan la demo.
 | `test` | Pruebas automatizadas |
 | `docs` | Configuración y operación |
 
-## Configuración pendiente
+## Etapa actual
+
+TRAZO se utiliza para pruebas y demostraciones con la dirección gratuita de Vercel y Supabase Free.
+El dominio propio y el correo corporativo se posponen hasta conseguir un comprador. La carpeta local
+y el repositorio se llaman `trazo`.
+
+El acceso con Google y los correos de confirmación y recuperación para destinatarios externos
+requieren completar la configuración de sus proveedores.
+
+## Configuración prevista al conseguir un comprador
 
 - Comprar el dominio y configurar el correo exclusivo de TRAZO en Zoho.
 - Configurar un proveedor transaccional SMTP para confirmaciones y recuperación en Supabase.

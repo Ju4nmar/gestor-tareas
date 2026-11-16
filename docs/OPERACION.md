@@ -1,5 +1,9 @@
 # Operación de TRAZO
 
+La etapa actual utiliza Vercel y Supabase Free para pruebas y demostraciones. El dominio propio,
+el correo corporativo y el proveedor transaccional se configurarán al conseguir un comprador.
+La dirección publicada es https://gestor-tareas-woad.vercel.app.
+
 ## Enfoque técnico
 
 - **Next.js (React) + TypeScript + Tailwind CSS**, con **Supabase** (Postgres y autenticación).

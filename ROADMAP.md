@@ -1,5 +1,11 @@
 # Hoja de ruta de TRAZO
 
+## Etapa actual
+
+Pruebas y demostraciones con Vercel y Supabase Free. Dominio, correo corporativo y envío transaccional
+pospuestos hasta conseguir un comprador. Carpeta local `trazo` y repositorio `Ju4nmar/trazo`, con una
+sola rama `main`. El renombrado local conserva los identificadores de los servicios conectados.
+
 ## Entregado
 
 - Rediseño TRAZO, acceso adaptable, temas y navegación móvil.
@@ -30,7 +36,7 @@ Los cambios SQL se incluyen en migraciones y se agregan al final de `supabase/sc
 Código integrado en `main`. Botón en acceso y registro, manejo de errores y pruebas automatizadas.
 Pendiente crear el cliente web en Google Cloud, habilitar el proveedor en Supabase y probar el recorrido real.
 
-## Pendientes del propietario
+## Pendientes operativos y próxima etapa
 
 - Comprar el dominio, crear el correo exclusivo de TRAZO en Zoho, elegir un proveedor transaccional para el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.
 - Revisar el límite de gasto de GitHub en Billing > Budgets and alerts. La API disponible no permite confirmar esta configuración de la cuenta personal.
