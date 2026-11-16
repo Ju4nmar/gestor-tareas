@@ -139,3 +139,19 @@ externas, completar los requisitos de Google y publicar la aplicación OAuth.
 
 Probar una cuenta nueva, una cuenta existente y la aceptación de una invitación con esa sesión.
 La activación y la prueba real quedan pendientes de las credenciales del propietario. El código forma parte de main.
+
+
+## Dominio y correo corporativo
+
+Cloudflare Free permite administrar el DNS y conectar el dominio con Vercel y Zoho. El registro y la
+renovación del dominio tienen su propio precio. Zoho Mail dispone de una guía específica para añadir
+sus registros de verificación, MX, SPF y DKIM en Cloudflare.
+
+Zoho Mail se utilizará para la comunicación empresarial. Su política de uso excluye los correos
+automáticos y transaccionales, incluidas las activaciones de cuentas. Para los mensajes de Supabase,
+configurar un proveedor transaccional con el dominio verificado y credenciales SMTP propias.
+La elección y activación de este proveedor siguen pendientes.
+
+- [Cloudflare Registrar](https://developers.cloudflare.com/registrar/)
+- [Zoho con Cloudflare DNS](https://www.zoho.com/mail/help/adminconsole/cloudflare.html)
+- [Política de uso de Zoho Mail](https://www.zoho.com/mail/help/usage-policy.html)

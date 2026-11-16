@@ -73,7 +73,7 @@ con ROLLBACK. Las vistas previas de Vercel utilizan la demo.
 ## Configuración pendiente
 
 - Comprar el dominio y configurar el correo exclusivo de TRAZO en Zoho.
-- Configurar el envío SMTP de confirmaciones y recuperación en Supabase.
+- Configurar un proveedor transaccional SMTP para confirmaciones y recuperación en Supabase.
 - Crear el cliente OAuth de Google, habilitar el proveedor y probar el acceso real.
 
 [Configuración, publicación, permisos y respaldos](docs/OPERACION.md)

@@ -32,7 +32,7 @@ Pendiente crear el cliente web en Google Cloud, habilitar el proveedor en Supaba
 
 ## Pendientes del propietario
 
-- Comprar el dominio, crear el correo exclusivo de TRAZO en Zoho, elegir el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.
+- Comprar el dominio, crear el correo exclusivo de TRAZO en Zoho, elegir un proveedor transaccional para el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.
 - Revisar el límite de gasto de GitHub en Billing > Budgets and alerts. La API disponible no permite confirmar esta configuración de la cuenta personal.
 - Guardar periódicamente las copias de empresa en una ubicación privada externa. Ensayar la recuperación con una copia reciente que incluya archivos.
 - Preparar además un respaldo completo de Postgres/Auth y Storage para recuperación ante pérdida del proyecto. Las copias de empresa recuperan datos operativos y generan nuevas invitaciones.
