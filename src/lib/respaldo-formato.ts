@@ -1,5 +1,5 @@
 export type FilaRespaldo = Record<string, unknown>;
-export type ArchivoRespaldo = {
+type ArchivoRespaldo = {
   bucket: string;
   path: string;
   mime: string;
@@ -14,7 +14,7 @@ export type Respaldo = {
   files: ArchivoRespaldo[];
 };
 
-export const tablasRespaldo = [
+const tablasRespaldo = [
   "profiles",
   "projects",
   "tasks",

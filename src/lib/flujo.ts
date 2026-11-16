@@ -95,21 +95,12 @@ export function vencida(tarea: Tarea, hoy: string) {
   return abierta(tarea) && dias !== null && dias < 0;
 }
 
-/** Vence hoy o en los próximos `dias` días. */
-export function proxima(tarea: Tarea, hoy: string, dias = 3) {
-  const faltan = diasRestantes(tarea, hoy);
-  return abierta(tarea) && faltan !== null && faltan >= 0 && faltan <= dias;
-}
-
 /** Estados en que la tarea espera algo del administrador. */
 export const ESPERA_ADMIN: Estado[] = ["aclaracion", "enviada", "en_revision"];
-/** Estados en que la tarea espera algo de su responsable. */
-export const ESPERA_RESPONSABLE: Estado[] = ["asignada", "aceptada", "en_curso", "devuelta"];
 
 /** Código corto de una tarea: "T-042". */
 export const codigoTarea = (numero: number) => `T-${String(numero).padStart(3, "0")}`;
 
-/** Operación rechazada: lleva la clave del motivo para mostrar el texto en el idioma elegido. */
 /** Estado que ve el cliente: resume el flujo interno en tres etapas. */
 export const etapaDe = (estado: Estado): Etapa =>
   estado === "completada"

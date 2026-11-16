@@ -402,7 +402,7 @@ const es = {
 };
 
 // El tipo permite leer muestras de versiones anteriores.
-export type Idioma = "es" | "en";
+type Idioma = "es" | "en";
 export type Textos = typeof es;
 export const idiomaActual = (): Idioma => "es";
 

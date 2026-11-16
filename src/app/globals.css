@@ -8,12 +8,6 @@
   --noche: #0c172b;
   --cian: #16d2f2;
   --advertencia: #f59e0b;
-  --espacio-1: 4px;
-  --espacio-2: 8px;
-  --espacio-3: 12px;
-  --espacio-4: 16px;
-  --espacio-6: 24px;
-  --espacio-8: 32px;
   --duracion-interaccion: 180ms;
   /* --- LIENZO Y SUPERFICIES (MODERNO, MINIMALISTA Y LIMPIO) --- */
   --papel: #f5f8fc;
@@ -77,12 +71,8 @@
   --e-completada-borde: #a7f3d0;
 
   /* Ergonomía táctil y radios modernos */
-  --touch-target-min: 44px;
-  --touch-target-field: 48px;
-  --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-  --radius-xl: 20px;
   --sombra-card:
     0 3px 14px -6px rgb(25 71 130 / 0.16), 0 1px 2px rgb(25 71 130 / 0.03);
   --sombra-card-hover:
@@ -195,11 +185,6 @@ body {
     @apply text-[11px] font-semibold uppercase tracking-wider text-gris;
   }
 
-  /* Resaltado de texto / Badge de acento */
-  .resaltado {
-    @apply inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300;
-  }
-
   /* Botón primario moderno, ergonómico y táctil */
   .btn {
     @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-150 hover:bg-blue-700 hover:shadow active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 sm:min-h-[40px];
@@ -216,16 +201,6 @@ body {
   /* Botón secundario con línea limpia */
   .btn-linea {
     @apply border border-regla bg-hoja text-tinta shadow-sm hover:bg-hoja-hover hover:border-regla-fuerte hover:shadow-none;
-  }
-
-  /* Botón suave sin borde para acciones secundarias */
-  .btn-suave {
-    @apply rounded-lg border-transparent bg-transparent px-3 py-1.5 text-gris hover:bg-hoja-hover hover:text-tinta;
-  }
-
-  /* Botón de peligro / acción destructiva */
-  .btn-alerta {
-    @apply bg-red-600 text-white hover:bg-red-700 active:scale-[0.98];
   }
 
   /* Campo de formulario moderno */
@@ -674,40 +649,6 @@ button:disabled {
   flex: 1;
   height: 1px;
   background: var(--regla);
-}
-.demo-accesos {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.demo-accesos button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(4px, 1dvh, 9px);
-  border: 1px solid var(--regla);
-  border-radius: 12px;
-  background: var(--papel);
-  padding: clamp(7px, 1.5dvh, 13px) 3px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--tinta);
-  transition:
-    border-color 0.18s,
-    background 0.18s;
-}
-.demo-accesos button:hover {
-  background: var(--marca-suave);
-  border-color: var(--marca);
-}
-.demo-accesos svg {
-  width: 23px;
-  height: 23px;
-  color: var(--marca);
-}
-.demo-accesos button:last-child svg {
-  color: #b66c00;
 }
 .demo-nota {
   text-align: center;
@@ -1395,14 +1336,6 @@ button:disabled {
   }
   .demo-separador {
     margin: 12px 0 8px;
-  }
-  .demo-accesos button {
-    gap: 4px;
-    padding: 7px 3px;
-  }
-  .demo-accesos svg {
-    width: 20px;
-    height: 20px;
   }
   .demo-nota {
     margin-top: 6px;

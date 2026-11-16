@@ -25,18 +25,17 @@ Las pruebas SQL `supabase/tests/empresas.sql` y `supabase/tests/operaciones.sql`
 Cubren aislamiento, roles, invitaciones, archivos, pesos, plantillas, creación repetida, búsqueda de más de 1.000 tareas y recuperación.
 Los cambios SQL se incluyen en migraciones y se agregan al final de `supabase/schema.sql`.
 
-## Acceso con Google en preparación
+## Acceso con Google pendiente de activación
 
-Rama `feature/login-google`. Botón en acceso y registro, manejo de errores y pruebas automatizadas.
+Código integrado en `main`. Botón en acceso y registro, manejo de errores y pruebas automatizadas.
 Pendiente crear el cliente web en Google Cloud, habilitar el proveedor en Supabase y probar el recorrido real.
 
 ## Pendientes del propietario
 
-- Crear una cuenta de correo exclusiva de TRAZO, elegir el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.
+- Comprar el dominio, crear el correo exclusivo de TRAZO en Zoho, elegir el envío SMTP y guardar sus credenciales en Supabase. Verificar confirmación, recuperación e invitaciones con destinatarios externos.
 - Revisar el límite de gasto de GitHub en Billing > Budgets and alerts. La API disponible no permite confirmar esta configuración de la cuenta personal.
 - Guardar periódicamente las copias de empresa en una ubicación privada externa. Ensayar la recuperación con una copia reciente que incluya archivos.
 - Preparar además un respaldo completo de Postgres/Auth y Storage para recuperación ante pérdida del proyecto. Las copias de empresa recuperan datos operativos y generan nuevas invitaciones.
-- La protección obligatoria de main en este repositorio privado requiere un plan compatible de GitHub.
 
 ## Límites actuales
 

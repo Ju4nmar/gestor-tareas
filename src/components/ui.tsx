@@ -14,7 +14,7 @@ import type { Estado, Evento, Fallo, Prioridad, Tarea } from "@/lib/types";
 export const falloDe = (e: unknown): Fallo => (e instanceof ErrorFlujo ? e.fallo : "error");
 
 /** Enlace de un solo uso con el que una persona invitada crea su contraseña. */
-export const enlaceInvitacion = (codigo: string) => `${window.location.origin}/activar?codigo=${codigo}`;
+const enlaceInvitacion = (codigo: string) => `${window.location.origin}/activar?codigo=${codigo}`;
 
 /** Copia el enlace de invitación; sin permiso para el portapapeles, lo muestra para copiarlo a mano. */
 export async function copiarInvitacion(codigo: string, titulo: string) {

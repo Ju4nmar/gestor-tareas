@@ -31,7 +31,7 @@ import type {
 // por una función de la base de datos; en el modo de muestra todo ocurre en la
 // pestaña (ver demo.ts). Las pantallas no distinguen entre uno y otro.
 
-export type State = {
+type State = {
   /** Ya se sabe si hay sesión o no. */
   listo: boolean;
   /** Correo de la sesión, tenga o no acceso. */
@@ -1127,7 +1127,7 @@ export async function salir() {
  * Nombre y correo de una invitación pendiente; `{ vencida: true }` si su código ya venció
  * (no se revela a quién era); nulo si el código no sirve.
  */
-export type InfoInvitacion =
+type InfoInvitacion =
   { name: string; email: string; company: string } | { vencida: true } | null;
 
 export async function infoInvitacion(codigo: string): Promise<InfoInvitacion> {

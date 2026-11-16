@@ -1,5 +1,5 @@
 /** Isotipo arquitectónico de TRAZO, legible sobre ambos temas. */
-export function Isotipo({ className = "" }: { className?: string }) {
+function Isotipo({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 64 64"
